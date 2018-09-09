@@ -28,7 +28,7 @@ makeoptions	FDT_DTS_FILE=tegra124-jetson-tk1-fbsd.dts
 
 makeoptions MODULES_OVERRIDE=""
 #options 	BOOTVERBOSE
-#options 	BOOTHOWTO=RB_SINGLE
+options 	BOOTHOWTO=RB_SINGLE
 
 #options 	ROOTDEVNAME=\"ufs:mmcsd0s2a\"
 options 	ROOTDEVNAME=\"ufs:ada0s1a\"
