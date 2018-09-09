@@ -31,6 +31,9 @@
  * - doesn't track currently in use pages
  */
 
+#ifndef __linux__
+#undef pr_fmt
+#endif
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <linux/list.h>
@@ -41,6 +44,9 @@
 #include <linux/mm.h>
 #include <linux/seq_file.h> /* for seq_printf */
 #include <linux/slab.h>
+#ifndef __linux__
+#include <linux/shrinker.h>
+#endif
 #include <linux/dma-mapping.h>
 
 #include <linux/atomic.h>
@@ -69,7 +75,11 @@
 struct ttm_page_pool {
 	spinlock_t		lock;
 	bool			fill_lock;
+#ifdef __linux__
 	struct list_head	list;
+#else
+	struct pglist		list;
+#endif
 	gfp_t			gfp_flags;
 	unsigned		npages;
 	char			*name;
@@ -169,6 +179,7 @@ static ssize_t ttm_pool_store(struct kobject *kobj,
 	else if (attr == &ttm_page_pool_small)
 		m->options.small = val;
 	else if (attr == &ttm_page_pool_alloc_size) {
+#ifdef __linux__
 		if (val > NUM_PAGES_TO_ALLOC*8) {
 			pr_err("Setting allocation size to %lu is not allowed. Recommended size is %lu\n",
 			       NUM_PAGES_TO_ALLOC*(PAGE_SIZE >> 7),
@@ -178,6 +189,18 @@ static ssize_t ttm_pool_store(struct kobject *kobj,
 			pr_warn("Setting allocation size to larger than %lu is not recommended\n",
 				NUM_PAGES_TO_ALLOC*(PAGE_SIZE >> 10));
 		}
+#else
+		if (val > NUM_PAGES_TO_ALLOC*8) {
+			pr_err("Setting allocation size to %ju is not allowed. Recommended size is %ju\n",
+			       (uintmax_t)NUM_PAGES_TO_ALLOC*(PAGE_SIZE >> 7),
+			       (uintmax_t)NUM_PAGES_TO_ALLOC*(PAGE_SIZE >> 10));
+			return size;
+		} else if (val > NUM_PAGES_TO_ALLOC) {
+			pr_warn("Setting allocation size to larger than %ju is not recommended\n",
+				(uintmax_t)NUM_PAGES_TO_ALLOC*(PAGE_SIZE >> 10));
+		}
+
+#endif
 		m->options.alloc_size = val;
 	}
 
@@ -259,6 +282,11 @@ static void ttm_pages_put(struct page *pages[], unsigned npages,
 			if (ttm_set_pages_wb(pages[i], pages_nr))
 				pr_err("Failed to set %d pages to wb!\n", pages_nr);
 		}
+#ifndef __linux__
+		vm_page_lock(pages[i]);
+		vm_page_unwire(pages[i], PQ_NONE);
+		vm_page_unlock(pages[i]);
+#endif
 		__free_pages(pages[i], order);
 	}
 }
@@ -289,6 +317,9 @@ static int ttm_page_pool_free(struct ttm_page_pool *pool, unsigned nr_free,
 	struct page **pages_to_free;
 	unsigned freed_pages = 0,
 		 npages_to_free = nr_free;
+#ifndef __linux__
+	int i;
+#endif
 
 	if (NUM_PAGES_TO_ALLOC < nr_free)
 		npages_to_free = NUM_PAGES_TO_ALLOC;
@@ -307,7 +338,11 @@ static int ttm_page_pool_free(struct ttm_page_pool *pool, unsigned nr_free,
 restart:
 	spin_lock_irqsave(&pool->lock, irq_flags);
 
+#ifdef __linux__
 	list_for_each_entry_reverse(p, &pool->list, lru) {
+#else
+	TAILQ_FOREACH_REVERSE(p, &pool->list, pglist, plinks.q) {
+#endif
 		if (freed_pages >= npages_to_free)
 			break;
 
@@ -315,7 +350,14 @@ restart:
 		/* We can only remove NUM_PAGES_TO_ALLOC at a time. */
 		if (freed_pages >= NUM_PAGES_TO_ALLOC) {
 			/* remove range of pages from the pool */
+#ifdef __linux__
 			__list_del(p->lru.prev, &pool->list);
+#else
+			for (i = 0; i < freed_pages; i++) {
+				TAILQ_REMOVE(&pool->list, pages_to_free[i],
+				    plinks.q);
+			}
+#endif
 
 			ttm_pool_update_free_locked(pool, freed_pages);
 			/**
@@ -350,7 +392,13 @@ restart:
 
 	/* remove range of pages from the pool */
 	if (freed_pages) {
+#ifdef __linux__
 		__list_del(&p->lru, &pool->list);
+#else
+		for (i = 0; i < freed_pages; i++) {
+			TAILQ_REMOVE(&pool->list, pages_to_free[i], plinks.q);
+		}
+#endif
 
 		ttm_pool_update_free_locked(pool, freed_pages);
 		nr_free -= freed_pages;
@@ -466,14 +514,25 @@ static int ttm_set_pages_caching(struct page **pages,
  * any pages that have changed their caching state already put them to the
  * pool.
  */
+#ifdef __linux__
 static void ttm_handle_caching_state_failure(struct list_head *pages,
+#else
+static void ttm_handle_caching_state_failure(struct pglist *pages,
+#endif
 		int ttm_flags, enum ttm_caching_state cstate,
 		struct page **failed_pages, unsigned cpages)
 {
 	unsigned i;
 	/* Failed pages have to be freed */
 	for (i = 0; i < cpages; ++i) {
+#ifdef __linux__
 		list_del(&failed_pages[i]->lru);
+#else
+		TAILQ_REMOVE(pages, failed_pages[i], plinks.q);
+		vm_page_lock(failed_pages[i]);
+		vm_page_unwire(failed_pages[i], PQ_NONE);
+		vm_page_unlock(failed_pages[i]);
+#endif
 		__free_page(failed_pages[i]);
 	}
 }
@@ -484,7 +543,11 @@ static void ttm_handle_caching_state_failure(struct list_head *pages,
  * This function is reentrant if caller updates count depending on number of
  * pages returned in pages array.
  */
+#ifdef __linux__
 static int ttm_alloc_new_pages(struct list_head *pages, gfp_t gfp_flags,
+#else
+static int ttm_alloc_new_pages(struct pglist *pages, gfp_t gfp_flags,
+#endif
 			       int ttm_flags, enum ttm_caching_state cstate,
 			       unsigned count, unsigned order)
 {
@@ -524,7 +587,14 @@ static int ttm_alloc_new_pages(struct list_head *pages, gfp_t gfp_flags,
 			goto out;
 		}
 
+#ifdef __linux__
 		list_add(&p->lru, pages);
+#else
+		vm_page_lock(p);
+		vm_page_wire(p);
+		vm_page_unlock(p);
+		TAILQ_INSERT_HEAD(pages, p, plinks.q);
+#endif
 
 #ifdef CONFIG_HIGHMEM
 		/* gfp flags of highmem page should never be dma32 so we
@@ -589,7 +659,11 @@ static void ttm_page_pool_fill_locked(struct ttm_page_pool *pool, int ttm_flags,
 	 * pages in a pool we fill the pool up first. */
 	if (count < _manager->options.small
 		&& count > pool->npages) {
+#ifdef __linux__
 		struct list_head new_pages;
+#else
+		struct pglist new_pages;
+#endif
 		unsigned alloc_size = _manager->options.alloc_size;
 
 		/**
@@ -598,22 +672,38 @@ static void ttm_page_pool_fill_locked(struct ttm_page_pool *pool, int ttm_flags,
 		 */
 		spin_unlock_irqrestore(&pool->lock, *irq_flags);
 
+#ifdef __linux__
 		INIT_LIST_HEAD(&new_pages);
+#else
+		TAILQ_INIT(&new_pages);
+#endif
 		r = ttm_alloc_new_pages(&new_pages, pool->gfp_flags, ttm_flags,
 					cstate, alloc_size, 0);
 		spin_lock_irqsave(&pool->lock, *irq_flags);
 
 		if (!r) {
+#ifdef __linux__
 			list_splice(&new_pages, &pool->list);
+#else
+			TAILQ_CONCAT(&pool->list, &new_pages, plinks.q);
+#endif
 			++pool->nrefills;
 			pool->npages += alloc_size;
 		} else {
 			pr_debug("Failed to fill pool (%p)\n", pool);
 			/* If we have any pages left put them to the pool. */
+#ifdef __linux__
 			list_for_each_entry(p, &new_pages, lru) {
+#else
+			TAILQ_FOREACH(p, &pool->list, plinks.q) {
+#endif
 				++cpages;
 			}
+#ifdef __linux__
 			list_splice(&new_pages, &pool->list);
+#else
+			TAILQ_CONCAT(&pool->list, &new_pages, plinks.q);
+#endif
 			pool->npages += cpages;
 		}
 
@@ -627,13 +717,22 @@ static void ttm_page_pool_fill_locked(struct ttm_page_pool *pool, int ttm_flags,
  * @return zero for success or negative error code.
  */
 static int ttm_page_pool_get_pages(struct ttm_page_pool *pool,
+#ifdef __linux__
 				   struct list_head *pages,
+#else
+				   struct pglist *pages,
+#endif
+
 				   int ttm_flags,
 				   enum ttm_caching_state cstate,
 				   unsigned count, unsigned order)
 {
 	unsigned long irq_flags;
+#ifdef __linux__
 	struct list_head *p;
+#else
+	struct page *p;
+#endif
 	unsigned i;
 	int r = 0;
 
@@ -644,13 +743,18 @@ static int ttm_page_pool_get_pages(struct ttm_page_pool *pool,
 
 	if (count >= pool->npages) {
 		/* take all pages from the pool */
+#ifdef __linux__
 		list_splice_init(&pool->list, pages);
+#else
+		TAILQ_CONCAT(pages, &pool->list, plinks.q);
+#endif
 		count -= pool->npages;
 		pool->npages = 0;
 		goto out;
 	}
 	/* find the last pages to include for requested number of pages. Split
 	 * pool to begin and halve it to reduce search space. */
+#ifdef __linux__
 	if (count <= pool->npages/2) {
 		i = 0;
 		list_for_each(p, &pool->list) {
@@ -666,6 +770,13 @@ static int ttm_page_pool_get_pages(struct ttm_page_pool *pool,
 	}
 	/* Cut 'count' number of pages from the pool */
 	list_cut_position(pages, &pool->list, p);
+#else
+	for (i = 0; i < count; i++) {
+		p = TAILQ_FIRST(&pool->list);
+		TAILQ_REMOVE(&pool->list, p, plinks.q);
+		TAILQ_INSERT_TAIL(pages, p, plinks.q);
+	}
+#endif
 	pool->npages -= count;
 	count = 0;
 out:
@@ -674,13 +785,18 @@ out:
 	/* clear the pages coming from the pool if requested */
 	if (ttm_flags & TTM_PAGE_FLAG_ZERO_ALLOC) {
 		struct page *page;
-
+#ifdef __linux__
 		list_for_each_entry(page, pages, lru) {
 			if (PageHighMem(page))
 				clear_highpage(page);
 			else
 				clear_page(page_address(page));
 		}
+#else
+		TAILQ_FOREACH(page, pages, plinks.q) {
+			pmap_zero_page(page);
+		}
+#endif
 	}
 
 	/* If pool didn't have enough pages allocate new one. */
@@ -742,6 +858,11 @@ static void ttm_put_pages(struct page **pages, unsigned npages, int flags,
 
 			if (page_count(pages[i]) != 1)
 				pr_err("Erroneous page count. Leaking pages.\n");
+#ifndef __linux__
+			vm_page_lock(pages[i]);
+			vm_page_unwire(pages[i], PQ_NONE);
+			vm_page_unlock(pages[i]);
+#endif
 			__free_pages(pages[i], order);
 
 			j = 1 << order;
@@ -798,7 +919,11 @@ static void ttm_put_pages(struct page **pages, unsigned npages, int flags,
 		if (pages[i]) {
 			if (page_count(pages[i]) != 1)
 				pr_err("Erroneous page count. Leaking pages.\n");
+#ifdef __linux__
 			list_add_tail(&pages[i]->lru, &pool->list);
+#else
+			TAILQ_INSERT_TAIL(&pool->list, pages[i], plinks.q);
+#endif
 			pages[i] = NULL;
 			pool->npages++;
 		}
@@ -829,7 +954,11 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	struct ttm_page_pool *huge = ttm_get_pool(flags, true, cstate);
 #endif
+#ifdef __linux__
 	struct list_head plist;
+#else
+	struct pglist plist;
+#endif
 	struct page *p = NULL;
 	unsigned count, first;
 	int r;
@@ -884,6 +1013,11 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 				return -ENOMEM;
 			}
 
+#ifndef __linux__
+			vm_page_lock(p);
+			vm_page_wire(p);
+			vm_page_unlock(p);
+#endif
 			/* Swap the pages if we detect consecutive order */
 			if (i > first && pages[i - 1] == p - 1)
 				swap(p, pages[i - 1]);
@@ -894,6 +1028,7 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 		return 0;
 	}
 
+#ifdef __linux__
 	count = 0;
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
@@ -926,6 +1061,21 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 		pages[count++] = tmp;
 	}
 
+#else
+	TAILQ_INIT(&plist);
+	r = ttm_page_pool_get_pages(pool, &plist, flags, cstate,
+	    npages, 0);
+	count = 0;
+	first = count;
+	TAILQ_FOREACH(p, &plist, plinks.q) {
+		struct page *tmp = p;
+
+		/* Swap the pages if we detect consecutive order */
+		if (count > first && pages[count - 1] == tmp - 1)
+			swap(tmp, pages[count - 1]);
+		pages[count++] = tmp;
+	}
+#endif
 	if (r) {
 		/* If there is any pages in the list put them back to
 		 * the pool.
@@ -943,7 +1093,11 @@ static void ttm_page_pool_init_locked(struct ttm_page_pool *pool, gfp_t flags,
 {
 	spin_lock_init(&pool->lock);
 	pool->fill_lock = false;
+#ifdef __linux__
 	INIT_LIST_HEAD(&pool->list);
+#else
+	TAILQ_INIT(&pool->list);
+#endif
 	pool->npages = pool->nfrees = 0;
 	pool->gfp_flags = flags;
 	pool->name = name;

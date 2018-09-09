@@ -51,6 +51,7 @@ struct drm_vma_entry {
 	pid_t pid;
 };
 
+#ifdef __linux__
 static void drm_vm_open(struct vm_area_struct *vma);
 static void drm_vm_close(struct vm_area_struct *vma);
 
@@ -656,3 +657,4 @@ void drm_legacy_vma_flush(struct drm_device *dev)
 		kfree(vma);
 	}
 }
+#endif

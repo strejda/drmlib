@@ -30,6 +30,10 @@
 #ifndef DRM_FB_HELPER_H
 #define DRM_FB_HELPER_H
 
+#ifndef __linux__
+#include <drm/drm_fb_helper_freebsd.h>
+#else
+
 struct drm_fb_helper;
 
 #include <drm/drm_client.h>
@@ -615,4 +619,5 @@ drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 #endif
 }
 
+#endif
 #endif

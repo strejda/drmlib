@@ -23,7 +23,7 @@
  * Rob Clark <robdclark@gmail.com>
  */
 
-#define DEBUG /* for pr_debug() */
+//#define DEBUG /* for pr_debug() */
 
 #include <stdarg.h>
 #include <linux/seq_file.h>
@@ -169,7 +169,8 @@ void drm_printf(struct drm_printer *p, const char *f, ...)
 	va_list args;
 
 	va_start(args, f);
-	drm_vprintf(p, f, &args);
+//	drm_vprintf(p, f, &args);
+vprintf(f, args);
 	va_end(args);
 }
 EXPORT_SYMBOL(drm_printf);
@@ -184,12 +185,14 @@ void drm_dev_printk(const struct device *dev, const char *level,
 	vaf.fmt = format;
 	vaf.va = &args;
 
-	if (dev)
-		dev_printk(level, dev, "[" DRM_NAME ":%ps] %pV",
-			   __builtin_return_address(0), &vaf);
-	else
-		printk("%s" "[" DRM_NAME ":%ps] %pV",
-		       level, __builtin_return_address(0), &vaf);
+//	if (dev)
+//		dev_printk(level, dev, "[" DRM_NAME ":%ps] %pV",
+//			   __builtin_return_address(0), &vaf);
+//	else
+//		printk("%s" "[" DRM_NAME ":%ps] %pV",
+//		       level, __builtin_return_address(0), &vaf);
+printf("%s" "[" DRM_NAME ": %p] ", level, __builtin_return_address(0));
+vprintf(format, args);
 
 	va_end(args);
 }
@@ -208,12 +211,14 @@ void drm_dev_dbg(const struct device *dev, unsigned int category,
 	vaf.fmt = format;
 	vaf.va = &args;
 
-	if (dev)
-		dev_printk(KERN_DEBUG, dev, "[" DRM_NAME ":%ps] %pV",
-			   __builtin_return_address(0), &vaf);
-	else
-		printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
-		       __builtin_return_address(0), &vaf);
+//	if (dev)
+//		dev_printk(KERN_DEBUG, dev, "[" DRM_NAME ":%ps] %pV",
+//			   __builtin_return_address(0), &vaf);
+//	else
+//		printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
+//		       __builtin_return_address(0), &vaf);
+printf(KERN_DEBUG "[" DRM_NAME ": %p] ",  __builtin_return_address(0));
+vprintf(format, args);
 
 	va_end(args);
 }
@@ -231,8 +236,10 @@ void drm_dbg(unsigned int category, const char *format, ...)
 	vaf.fmt = format;
 	vaf.va = &args;
 
-	printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
-	       __builtin_return_address(0), &vaf);
+//	printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
+//	       __builtin_return_address(0), &vaf);
+printf(KERN_DEBUG "[" DRM_NAME ": %p] ",  __builtin_return_address(0));
+vprintf(format, args);
 
 	va_end(args);
 }
@@ -247,8 +254,10 @@ void drm_err(const char *format, ...)
 	vaf.fmt = format;
 	vaf.va = &args;
 
-	printk(KERN_ERR "[" DRM_NAME ":%ps] *ERROR* %pV",
-	       __builtin_return_address(0), &vaf);
+//	printk(KERN_ERR "[" DRM_NAME ":%ps] *ERROR* %pV",
+//	       __builtin_return_address(0), &vaf);
+printf(KERN_ERR "[" DRM_NAME ": %p] *ERROR* ",  __builtin_return_address(0));
+vprintf(format, args);
 
 	va_end(args);
 }

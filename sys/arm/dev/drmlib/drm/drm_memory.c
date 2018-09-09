@@ -36,6 +36,10 @@
 #include <linux/highmem.h>
 #include <linux/export.h>
 #include <drm/drmP.h>
+#ifndef __linux__
+#include <drm/drm_cache.h>
+#endif
+
 #include "drm_legacy.h"
 
 #if IS_ENABLED(CONFIG_AGP)
@@ -152,6 +156,7 @@ EXPORT_SYMBOL(drm_legacy_ioremapfree);
 
 u64 drm_get_max_iomem(void)
 {
+#ifdef __linux__
 	struct resource *tmp;
 	resource_size_t max_iomem = 0;
 
@@ -160,5 +165,10 @@ u64 drm_get_max_iomem(void)
 	}
 
 	return max_iomem;
+#else
+	// Only used in combination with CONFIG_SWIOTLB in v4.17
+	// BSDFIXME: Let's say we can dma all physical memory...
+	return 0xFFFFFFFFFFFFFFFF;
+#endif
 }
 EXPORT_SYMBOL(drm_get_max_iomem);

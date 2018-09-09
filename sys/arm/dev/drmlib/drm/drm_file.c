@@ -311,7 +311,9 @@ int drm_open(struct inode *inode, struct file *filp)
 		need_setup = 1;
 
 	/* share address_space across all char-devs of a single device */
+#ifdef __linux__
 	filp->f_mapping = dev->anon_inode->i_mapping;
+#endif
 
 	retcode = drm_open_helper(filp, minor);
 	if (retcode)
@@ -612,7 +614,11 @@ __poll_t drm_poll(struct file *filp, struct poll_table_struct *wait)
 	poll_wait(filp, &file_priv->event_wait, wait);
 
 	if (!list_empty(&file_priv->event_list))
+#ifdef __linux__
 		mask |= EPOLLIN | EPOLLRDNORM;
+#else
+		mask |= POLLIN | POLLRDNORM;
+#endif
 
 	return mask;
 }

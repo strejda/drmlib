@@ -32,6 +32,9 @@
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/sched.h>
+#ifndef __linux__
+#include <linux/wait.h>
+#endif
 #include <drm/ttm/ttm_module.h>
 #include <drm/drm_sysfs.h>
 

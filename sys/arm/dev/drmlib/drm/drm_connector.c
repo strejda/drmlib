@@ -20,6 +20,9 @@
  * OF THIS SOFTWARE.
  */
 
+#ifndef __linux__
+#include <linux/refcount.h>
+#endif
 #include <drm/drmP.h>
 #include <drm/drm_connector.h>
 #include <drm/drm_edid.h>
@@ -595,7 +598,9 @@ __drm_connector_put_safe(struct drm_connector *conn)
 {
 	struct drm_mode_config *config = &conn->dev->mode_config;
 
+#ifdef __linux__
 	lockdep_assert_held(&config->connector_list_lock);
+#endif
 
 	if (!refcount_dec_and_test(&conn->base.refcount.refcount))
 		return;

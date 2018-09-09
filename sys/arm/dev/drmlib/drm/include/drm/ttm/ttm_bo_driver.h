@@ -30,6 +30,9 @@
 #ifndef _TTM_BO_DRIVER_H_
 #define _TTM_BO_DRIVER_H_
 
+#ifndef __linux__
+#include <drm/drmP.h>
+#endif
 #include <drm/drm_mm.h>
 #include <drm/drm_global.h>
 #include <drm/drm_vma_manager.h>
@@ -38,6 +41,10 @@
 #include <linux/spinlock.h>
 #include <linux/reservation.h>
 
+#ifndef __linux__
+#include <sys/rwlock.h>
+#include <sys/tree.h>
+#endif
 #include "ttm_bo_api.h"
 #include "ttm_memory.h"
 #include "ttm_module.h"
@@ -462,6 +469,10 @@ struct ttm_bo_device {
 	struct ttm_bo_global *glob;
 	struct ttm_bo_driver *driver;
 	struct ttm_mem_type_manager man[TTM_NUM_MEM_TYPES];
+#ifndef __linux__
+	rwlock_t vm_lock;
+	spinlock_t fence_lock;
+#endif
 
 	/*
 	 * Protected by internal locks.

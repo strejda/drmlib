@@ -26,6 +26,9 @@
  *
  **************************************************************************/
 
+#ifndef __linux__
+#undef pr_fmt
+#endif
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <drm/ttm/ttm_memory.h>
@@ -38,6 +41,10 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
+
+#ifndef __linux__
+#include <sys/priv.h>
+#endif
 
 #define TTM_MEMORY_ALLOC_RETRIES 4
 
@@ -252,7 +259,11 @@ static bool ttm_zones_above_swap_target(struct ttm_mem_global *glob,
 
 		if (from_wq)
 			target = zone->swap_limit;
+#ifdef __linux__
 		else if (capable(CAP_SYS_ADMIN))
+#else
+		else if (priv_check(curthread, PRIV_VM_MLOCK) == 0)
+#endif
 			target = zone->emer_mem;
 		else
 			target = zone->max_mem;
@@ -303,17 +314,25 @@ static void ttm_shrink_work(struct work_struct *work)
 }
 
 static int ttm_mem_init_kernel_zone(struct ttm_mem_global *glob,
+#ifdef __linux__
 				    const struct sysinfo *si)
+#else
+				    uint64_t mem)
+#endif
 {
 	struct ttm_mem_zone *zone = kzalloc(sizeof(*zone), GFP_KERNEL);
+#ifdef __linux__
 	uint64_t mem;
+#endif
 	int ret;
 
 	if (unlikely(!zone))
 		return -ENOMEM;
 
+#ifdef __linux__
 	mem = si->totalram - si->totalhigh;
 	mem *= si->mem_unit;
+#endif
 
 	zone->name = "kernel";
 	zone->zone_mem = mem;
@@ -371,17 +390,25 @@ static int ttm_mem_init_highmem_zone(struct ttm_mem_global *glob,
 }
 #else
 static int ttm_mem_init_dma32_zone(struct ttm_mem_global *glob,
+#ifdef __linux__
 				   const struct sysinfo *si)
+#else
+				   uint64_t mem)
+#endif
 {
 	struct ttm_mem_zone *zone = kzalloc(sizeof(*zone), GFP_KERNEL);
+#ifdef __linux__
 	uint64_t mem;
+#endif
 	int ret;
 
 	if (unlikely(!zone))
 		return -ENOMEM;
 
+#ifdef __linux__
 	mem = si->totalram;
 	mem *= si->mem_unit;
+#endif
 
 	/**
 	 * No special dma32 zone needed.
@@ -420,7 +447,11 @@ static int ttm_mem_init_dma32_zone(struct ttm_mem_global *glob,
 
 int ttm_mem_global_init(struct ttm_mem_global *glob)
 {
+#ifdef __linux__
 	struct sysinfo si;
+#else
+	u_int64_t mem;
+#endif
 	int ret;
 	int i;
 	struct ttm_mem_zone *zone;
@@ -435,12 +466,20 @@ int ttm_mem_global_init(struct ttm_mem_global *glob)
 		return ret;
 	}
 
+#ifdef __linux__
 	si_meminfo(&si);
+#else
+	mem = physmem * PAGE_SIZE;
+#endif
 
 	/* set it as 0 by default to keep original behavior of OOM */
 	glob->lower_mem_limit = 0;
 
+#ifdef __linux__
 	ret = ttm_mem_init_kernel_zone(glob, &si);
+#else
+	ret = ttm_mem_init_kernel_zone(glob, mem);
+#endif
 	if (unlikely(ret != 0))
 		goto out_no_zone;
 #ifdef CONFIG_HIGHMEM
@@ -448,7 +487,11 @@ int ttm_mem_global_init(struct ttm_mem_global *glob)
 	if (unlikely(ret != 0))
 		goto out_no_zone;
 #else
+#ifdef __linux__
 	ret = ttm_mem_init_dma32_zone(glob, &si);
+#else
+	ret = ttm_mem_init_dma32_zone(glob, mem);
+#endif
 	if (unlikely(ret != 0))
 		goto out_no_zone;
 #endif
@@ -554,7 +597,12 @@ ttm_check_under_lowerlimit(struct ttm_mem_global *glob,
 	if (ctx->flags & TTM_OPT_FLAG_FORCE_ALLOC)
 		return false;
 
+#ifdef __linux__
 	available = get_nr_swap_pages() + si_mem_available();
+#else
+	// XXX: get_nr_swap_pages is not implemented
+	available = get_nr_swap_pages() + vm_free_count();
+#endif
 	available -= num_pages;
 	if (available < glob->lower_mem_limit)
 		return true;

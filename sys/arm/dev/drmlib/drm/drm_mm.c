@@ -222,6 +222,9 @@ static void drm_mm_interval_tree_add_node(struct drm_mm_node *hole_node,
 				   &drm_mm_interval_tree_augment);
 }
 
+#ifndef __linux__
+#undef RB_INSERT
+#endif
 #define RB_INSERT(root, member, expr) do { \
 	struct rb_node **link = &root.rb_node, *rb = NULL; \
 	u64 x = expr(node); \

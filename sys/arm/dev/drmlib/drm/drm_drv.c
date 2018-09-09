@@ -47,7 +47,7 @@
  * drm_debug: Enable debug output.
  * Bitmask of DRM_UT_x. See include/drm/drmP.h for details.
  */
-unsigned int drm_debug = 0;
+unsigned int drm_debug = 0xFFFFFFFF;
 EXPORT_SYMBOL(drm_debug);
 
 MODULE_AUTHOR("Gareth Hughes, Leif Delgass, José Fonseca, Jon Smirl");
@@ -78,7 +78,9 @@ static bool drm_core_init_complete = false;
 
 static struct dentry *drm_debugfs_root;
 
+#ifdef __linux__
 DEFINE_STATIC_SRCU(drm_unplug_srcu);
+#endif
 
 /*
  * DRM Minors
@@ -335,12 +337,14 @@ EXPORT_SYMBOL(drm_put_dev);
  */
 bool drm_dev_enter(struct drm_device *dev, int *idx)
 {
+#ifdef __linux__
 	*idx = srcu_read_lock(&drm_unplug_srcu);
 
 	if (dev->unplugged) {
 		srcu_read_unlock(&drm_unplug_srcu, *idx);
 		return false;
 	}
+#endif
 
 	return true;
 }
@@ -355,7 +359,9 @@ EXPORT_SYMBOL(drm_dev_enter);
  */
 void drm_dev_exit(int idx)
 {
+#ifdef __linux__
 	srcu_read_unlock(&drm_unplug_srcu, idx);
+#endif
 }
 EXPORT_SYMBOL(drm_dev_exit);
 
@@ -378,7 +384,9 @@ void drm_dev_unplug(struct drm_device *dev)
 	 * finished.
 	 */
 	dev->unplugged = true;
+#ifdef __linux__
 	synchronize_srcu(&drm_unplug_srcu);
+#endif
 
 	drm_dev_unregister(dev);
 
@@ -389,6 +397,7 @@ void drm_dev_unplug(struct drm_device *dev)
 }
 EXPORT_SYMBOL(drm_dev_unplug);
 
+#ifdef __linux__
 /*
  * DRM internal mount
  * We want to be able to allocate our own "struct address_space" to control
@@ -460,6 +469,7 @@ static void drm_fs_inode_free(struct inode *inode)
 		simple_release_fs(&drm_fs_mnt, &drm_fs_cnt);
 	}
 }
+#endif
 
 /**
  * drm_dev_init - Initialise new DRM device
@@ -522,12 +532,15 @@ int drm_dev_init(struct drm_device *dev,
 	mutex_init(&dev->ctxlist_mutex);
 	mutex_init(&dev->master_mutex);
 
+#ifdef __linux__
 	dev->anon_inode = drm_fs_inode_new();
 	if (IS_ERR(dev->anon_inode)) {
 		ret = PTR_ERR(dev->anon_inode);
 		DRM_ERROR("Cannot allocate anonymous inode: %d\n", ret);
 		goto err_free;
 	}
+#endif
+
 
 	if (drm_core_check_feature(dev, DRIVER_RENDER)) {
 		ret = drm_minor_alloc(dev, DRM_MINOR_RENDER);
@@ -570,8 +583,10 @@ err_ctxbitmap:
 err_minors:
 	drm_minor_free(dev, DRM_MINOR_PRIMARY);
 	drm_minor_free(dev, DRM_MINOR_RENDER);
+#ifdef __linux__
 	drm_fs_inode_free(dev->anon_inode);
 err_free:
+#endif
 	mutex_destroy(&dev->master_mutex);
 	mutex_destroy(&dev->ctxlist_mutex);
 	mutex_destroy(&dev->clientlist_mutex);
@@ -602,7 +617,9 @@ void drm_dev_fini(struct drm_device *dev)
 
 	drm_legacy_ctxbitmap_cleanup(dev);
 	drm_ht_remove(&dev->map_hash);
+#ifdef __linux__
 	drm_fs_inode_free(dev->anon_inode);
+#endif
 
 	drm_minor_free(dev, DRM_MINOR_PRIMARY);
 	drm_minor_free(dev, DRM_MINOR_RENDER);
@@ -742,9 +759,13 @@ static int create_compat_control_link(struct drm_device *dev)
 	if (!name)
 		return -ENOMEM;
 
+#ifdef __linux__
 	ret = sysfs_create_link(minor->kdev->kobj.parent,
 				&minor->kdev->kobj,
 				name);
+#else
+	ret = 0;
+#endif
 
 	kfree(name);
 
@@ -767,7 +788,9 @@ static void remove_compat_control_link(struct drm_device *dev)
 	if (!name)
 		return;
 
+#ifdef __linux__
 	sysfs_remove_link(minor->kdev->kobj.parent, name);
+#endif
 
 	kfree(name);
 }
@@ -968,7 +991,9 @@ static const struct file_operations drm_stub_fops = {
 static void drm_core_exit(void)
 {
 	unregister_chrdev(DRM_MAJOR, "drm");
+#ifdef __linux__
 	debugfs_remove(drm_debugfs_root);
+#endif
 	drm_sysfs_destroy();
 	idr_destroy(&drm_minors_idr);
 	drm_connector_ida_destroy();
@@ -989,14 +1014,21 @@ static int __init drm_core_init(void)
 		goto error;
 	}
 
+#ifdef __linux__
 	drm_debugfs_root = debugfs_create_dir("dri", NULL);
 	if (!drm_debugfs_root) {
 		ret = -ENOMEM;
 		DRM_ERROR("Cannot create debugfs-root: %d\n", ret);
 		goto error;
 	}
+#endif
 
+#ifdef __linux__
 	ret = register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops);
+#else
+	ret = register_chrdev_p(DRM_MAJOR, "drm", &drm_stub_fops,
+	    DRM_DEV_UID, DRM_DEV_GID, DRM_DEV_MODE);
+#endif
 	if (ret < 0)
 		goto error;
 

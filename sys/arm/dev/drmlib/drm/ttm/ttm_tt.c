@@ -29,6 +29,9 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#ifndef __linux__
+#undef pr_fmt
+#endif
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <linux/sched.h>
@@ -119,8 +122,10 @@ static int ttm_tt_set_page_caching(struct page *p,
 {
 	int ret = 0;
 
+#ifdef __linux__
 	if (PageHighMem(p))
 		return 0;
+#endif
 
 	if (c_old != tt_cached) {
 		/* p isn't in the default caching state, set it to
@@ -223,6 +228,9 @@ void ttm_tt_destroy(struct ttm_tt *ttm)
 	ttm->func->destroy(ttm);
 }
 
+#ifndef __linux__
+static
+#endif
 void ttm_tt_init_fields(struct ttm_tt *ttm, struct ttm_buffer_object *bo,
 			uint32_t page_flags)
 {
@@ -346,7 +354,11 @@ EXPORT_SYMBOL(ttm_tt_bind);
 
 int ttm_tt_swapin(struct ttm_tt *ttm)
 {
+#ifdef __linux__
 	struct address_space *swap_space;
+#else
+	vm_object_t swap_space;
+#endif
 	struct file *swap_storage;
 	struct page *from_page;
 	struct page *to_page;
@@ -356,7 +368,11 @@ int ttm_tt_swapin(struct ttm_tt *ttm)
 	swap_storage = ttm->swap_storage;
 	BUG_ON(swap_storage == NULL);
 
+#ifdef __linux__
 	swap_space = swap_storage->f_mapping;
+#else
+	swap_space = swap_storage->f_shmem;
+#endif
 
 	for (i = 0; i < ttm->num_pages; ++i) {
 		gfp_t gfp_mask = mapping_gfp_mask(swap_space);
@@ -388,7 +404,11 @@ out_err:
 
 int ttm_tt_swapout(struct ttm_tt *ttm, struct file *persistent_swap_storage)
 {
+#ifdef __linux__
 	struct address_space *swap_space;
+#else
+	vm_object_t swap_space;
+#endif
 	struct file *swap_storage;
 	struct page *from_page;
 	struct page *to_page;
@@ -410,7 +430,11 @@ int ttm_tt_swapout(struct ttm_tt *ttm, struct file *persistent_swap_storage)
 		swap_storage = persistent_swap_storage;
 	}
 
+#ifdef __linux__
 	swap_space = swap_storage->f_mapping;
+#else
+	swap_space = swap_storage->f_shmem;
+#endif
 
 	for (i = 0; i < ttm->num_pages; ++i) {
 		gfp_t gfp_mask = mapping_gfp_mask(swap_space);
@@ -448,6 +472,7 @@ out_err:
 
 static void ttm_tt_add_mapping(struct ttm_tt *ttm)
 {
+#ifdef __linux__
 	pgoff_t i;
 
 	if (ttm->page_flags & TTM_PAGE_FLAG_SG)
@@ -455,6 +480,11 @@ static void ttm_tt_add_mapping(struct ttm_tt *ttm)
 
 	for (i = 0; i < ttm->num_pages; ++i)
 		ttm->pages[i]->mapping = ttm->bdev->dev_mapping;
+#else
+	if (ttm->page_flags & TTM_PAGE_FLAG_SG)
+		return;
+
+#endif
 }
 
 int ttm_tt_populate(struct ttm_tt *ttm, struct ttm_operation_ctx *ctx)
@@ -475,6 +505,7 @@ int ttm_tt_populate(struct ttm_tt *ttm, struct ttm_operation_ctx *ctx)
 
 static void ttm_tt_clear_mapping(struct ttm_tt *ttm)
 {
+#ifdef __linux__
 	pgoff_t i;
 	struct page **page = ttm->pages;
 
@@ -485,6 +516,7 @@ static void ttm_tt_clear_mapping(struct ttm_tt *ttm)
 		(*page)->mapping = NULL;
 		(*page++)->index = 0;
 	}
+#endif
 }
 
 void ttm_tt_unpopulate(struct ttm_tt *ttm)

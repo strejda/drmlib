@@ -6,6 +6,7 @@
 #include <linux/types.h>
 #include <linux/tracepoint.h>
 
+#ifdef __linux__
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM drm
 #define TRACE_INCLUDE_FILE drm_trace
@@ -58,6 +59,9 @@ TRACE_EVENT(drm_vblank_event_delivered,
 		      __entry->seq)
 );
 
+#else
+#include <drm/drm_trace_freebsd.h>
+#endif
 #endif /* _DRM_TRACE_H_ */
 
 /* This part must be outside protection */

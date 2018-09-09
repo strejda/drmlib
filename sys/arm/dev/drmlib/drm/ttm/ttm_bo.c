@@ -29,6 +29,9 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#ifndef __linux__
+#undef pr_fmt
+#endif
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <drm/ttm/ttm_module.h>
@@ -77,8 +80,13 @@ static void ttm_mem_type_debug(struct ttm_bo_device *bdev, int mem_type)
 	pr_err("    has_type: %d\n", man->has_type);
 	pr_err("    use_type: %d\n", man->use_type);
 	pr_err("    flags: 0x%08X\n", man->flags);
+#ifdef __linux__
 	pr_err("    gpu_offset: 0x%08llX\n", man->gpu_offset);
 	pr_err("    size: %llu\n", man->size);
+#else
+	pr_err("    gpu_offset: 0x%08jX\n", (uintmax_t)man->gpu_offset);
+	pr_err("    size: %ju\n", (uintmax_t)man->size);
+#endif
 	pr_err("    available_caching: 0x%08X\n", man->available_caching);
 	pr_err("    default_caching: 0x%08X\n", man->default_caching);
 	if (mem_type != TTM_PL_SYSTEM)
@@ -1559,7 +1567,9 @@ int ttm_bo_device_init(struct ttm_bo_device *bdev,
 				    0x10000000);
 	INIT_DELAYED_WORK(&bdev->wq, ttm_bo_delayed_workqueue);
 	INIT_LIST_HEAD(&bdev->ddestroy);
+#ifdef __linux__
 	bdev->dev_mapping = mapping;
+#endif
 	bdev->glob = glob;
 	bdev->need_dma32 = need_dma32;
 	mutex_lock(&glob->device_list_mutex);
@@ -1595,9 +1605,17 @@ bool ttm_mem_reg_is_pci(struct ttm_bo_device *bdev, struct ttm_mem_reg *mem)
 
 void ttm_bo_unmap_virtual_locked(struct ttm_buffer_object *bo)
 {
+#ifdef __linux__
 	struct ttm_bo_device *bdev = bo->bdev;
 
 	drm_vma_node_unmap(&bo->vma_node, bdev->dev_mapping);
+#else
+	struct drm_vma_offset_node *node;
+
+	node = &bo->vma_node;
+	unmap_mapping_range(bo, drm_vma_node_offset_addr(node),
+	    drm_vma_node_size(node) << PAGE_SHIFT, 1);
+#endif
 	ttm_mem_io_free_vm(bo);
 }
 

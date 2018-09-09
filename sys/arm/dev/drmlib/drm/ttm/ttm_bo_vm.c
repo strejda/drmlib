@@ -29,6 +29,9 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#ifndef __linux__
+#undef pr_fmt
+#endif
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <drm/ttm/ttm_module.h>
@@ -69,7 +72,10 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 			goto out_unlock;
 
 		ttm_bo_get(bo);
+#ifdef __linux__
+		/* On FreeBSD we're not holding locks here. */
 		up_read(&vmf->vma->vm_mm->mmap_sem);
+#endif
 		(void) dma_fence_wait(bo->moving, true);
 		ttm_bo_unreserve(bo);
 		ttm_bo_put(bo);
@@ -106,7 +112,11 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
 		+ page_offset;
 }
 
+#ifdef __linux__
 static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
+#else
+static vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *dummy, struct vm_fault *vmf)
+#endif
 {
 	struct vm_area_struct *vma = vmf->vma;
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
@@ -139,7 +149,11 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
+#ifdef __linux__
+				/* On FreeBSD we're not holding locks here. */
 				up_read(&vmf->vma->vm_mm->mmap_sem);
+#endif
+
 				(void) ttm_bo_wait_unreserved(bo);
 				ttm_bo_put(bo);
 			}
@@ -249,6 +263,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * Speculatively prefault a number of pages. Only error on
 	 * first page.
 	 */
+#ifdef __linux__
 	for (i = 0; i < TTM_BO_VM_NUM_PREFAULT; ++i) {
 		if (bo->mem.bus.is_iomem) {
 			/* Iomem should not be marked encrypted */
@@ -288,6 +303,51 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 			break;
 	}
 	ret = VM_FAULT_NOPAGE;
+#else
+	vm_object_t obj;
+	vm_pindex_t pidx;
+
+	obj = vma->vm_obj;
+	pidx = OFF_TO_IDX(address);
+	vma->vm_pfn_first = pidx;
+
+	VM_OBJECT_WLOCK(obj);
+	for (i = 0; i < TTM_BO_VM_NUM_PREFAULT && page_offset < page_last;
+	    i++, page_offset++, pidx++) {
+retry:
+		page = vm_page_lookup(obj, pidx);
+		if (page != NULL) {
+			if (vm_page_sleep_if_busy(page, "ttmflt"))
+				goto retry;
+		} else {
+			if (bo->mem.bus.is_iomem) {
+				pfn = OFF_TO_IDX(bo->mem.bus.base +
+				    bo->mem.bus.offset) + page_offset;
+				page = PHYS_TO_VM_PAGE(IDX_TO_OFF(pfn));
+			} else {
+				page = ttm->pages[page_offset];
+				if (page == NULL)
+					goto fail;
+				page->oflags &= ~VPO_UNMANAGED;
+			}
+			if (vm_page_busied(page))
+				goto fail;
+			if (vm_page_insert(page, obj, pidx))
+				goto fail;
+			page->valid = VM_PAGE_BITS_ALL;
+		}
+		pmap_page_set_memattr(page,
+		    pgprot2cachemode(cvma.vm_page_prot));
+		vm_page_xbusy(page);
+		vma->vm_pfn_count++;
+		continue;
+fail:
+		if (i == 0)
+			ret = VM_FAULT_OOM;
+		break;
+	}
+	VM_OBJECT_WUNLOCK(obj);
+#endif
 out_io_unlock:
 	ttm_mem_io_unlock(man);
 out_unlock:
@@ -300,7 +360,9 @@ static void ttm_bo_vm_open(struct vm_area_struct *vma)
 	struct ttm_buffer_object *bo =
 	    (struct ttm_buffer_object *)vma->vm_private_data;
 
+#ifdef __linux__
 	WARN_ON(bo->bdev->dev_mapping != vma->vm_file->f_mapping);
+#endif
 
 	ttm_bo_get(bo);
 }

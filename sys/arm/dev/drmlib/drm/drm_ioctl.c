@@ -28,8 +28,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef __linux__
 #include <drm/drm_ioctl.h>
 #include <drm/drmP.h>
+#else
+// drmP.h must be the first to include because of file -> linux_file definition
+#include <drm/drmP.h>
+#include <drm/drm_ioctl.h>
+#endif
 #include <drm/drm_auth.h>
 #include "drm_legacy.h"
 #include "drm_internal.h"
@@ -37,6 +43,9 @@
 
 #include <linux/pci.h>
 #include <linux/export.h>
+#ifndef __linux__
+#include <linux/ioctl.h>
+#endif
 
 /**
  * DOC: getunique and setversion story
@@ -138,12 +147,20 @@ drm_unset_busid(struct drm_device *dev,
 static int drm_set_busid(struct drm_device *dev, struct drm_file *file_priv)
 {
 	struct drm_master *master = file_priv->master;
+#if defined(__linux__) || defined(CONFIG_PCI)
 	int ret;
+#endif
 
 	if (master->unique != NULL)
 		drm_unset_busid(dev, master);
 
+#if defined(__linux__) || defined(CONFIG_PCI)
+#ifdef __linux__
 	if (dev->dev && dev_is_pci(dev->dev)) {
+#else
+	// BSDFIXME: Assume it's PCI for now
+	if (dev->dev) {
+#endif
 		ret = drm_pci_set_busid(dev, master);
 		if (ret) {
 			drm_unset_busid(dev, master);
@@ -155,6 +172,12 @@ static int drm_set_busid(struct drm_device *dev, struct drm_file *file_priv)
 		if (master->unique)
 			master->unique_len = strlen(dev->unique);
 	}
+#else
+	WARN_ON(!dev->unique);
+	master->unique = kstrdup(dev->unique, GFP_KERNEL);
+	if (master->unique)
+		master->unique_len = strlen(dev->unique);
+#endif
 
 	return 0;
 }
@@ -191,7 +214,11 @@ int drm_getclient(struct drm_device *dev, void *data,
 	if (client->idx == 0) {
 		client->auth = file_priv->authenticated;
 		client->pid = task_pid_vnr(current);
+#ifdef __linux__
 		client->uid = overflowuid;
+#else
+		client->uid = 0;
+#endif
 		client->magic = 0;
 		client->iocs = 0;
 
@@ -789,7 +816,6 @@ long drm_ioctl(struct file *filp,
 
 	if (drm_dev_is_unplugged(dev))
 		return -ENODEV;
-
 	is_driver_ioctl = nr >= DRM_COMMAND_BASE && nr < DRM_COMMAND_END;
 
 	if (is_driver_ioctl) {

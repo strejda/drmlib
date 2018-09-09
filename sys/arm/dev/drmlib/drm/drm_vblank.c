@@ -253,9 +253,9 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 		diff = 1;
 	}
 
-	DRM_DEBUG_VBL("updating vblank count on crtc %u:"
-		      " current=%llu, diff=%u, hw=%u hw_last=%u\n",
-		      pipe, vblank->count, diff, cur_vblank, vblank->last);
+//	DRM_DEBUG_VBL("updating vblank count on crtc %u:"
+//		      " current=%llu, diff=%u, hw=%u hw_last=%u\n",
+//		      pipe, vblank->count, diff, cur_vblank, vblank->last);
 
 	if (diff == 0) {
 		WARN_ON_ONCE(cur_vblank != vblank->last);

@@ -1510,7 +1510,6 @@ drm_do_probe_ddc_edid(void *data, u8 *buf, unsigned int block, size_t len)
 		 * DDC monitors.
 		 */
 		ret = i2c_transfer(adapter, &msgs[3 - xfers], xfers);
-
 		if (ret == -ENXIO) {
 			DRM_DEBUG_KMS("drm: skipping non-existent adapter %s\n",
 					adapter->name);
@@ -1710,6 +1709,7 @@ struct edid *drm_get_edid(struct drm_connector *connector,
 }
 EXPORT_SYMBOL(drm_get_edid);
 
+#ifdef __linux__
 /**
  * drm_get_edid_switcheroo - get EDID data for a vga_switcheroo output
  * @connector: connector we're probing
@@ -1734,6 +1734,7 @@ struct edid *drm_get_edid_switcheroo(struct drm_connector *connector,
 	return edid;
 }
 EXPORT_SYMBOL(drm_get_edid_switcheroo);
+#endif
 
 /**
  * drm_edid_duplicate - duplicate an EDID and the extensions
@@ -2909,6 +2910,7 @@ cea_mode_alternate_timings(u8 vic, struct drm_display_mode *mode)
 	 * get the other variants by simply increasing the
 	 * vertical front porch length.
 	 */
+#ifdef __linux__
 	BUILD_BUG_ON(edid_cea_modes[8].vtotal != 262 ||
 		     edid_cea_modes[9].vtotal != 262 ||
 		     edid_cea_modes[12].vtotal != 262 ||
@@ -2917,6 +2919,7 @@ cea_mode_alternate_timings(u8 vic, struct drm_display_mode *mode)
 		     edid_cea_modes[24].vtotal != 312 ||
 		     edid_cea_modes[27].vtotal != 312 ||
 		     edid_cea_modes[28].vtotal != 312);
+#endif
 
 	if (((vic == 8 || vic == 9 ||
 	      vic == 12 || vic == 13) && mode->vtotal < 263) ||

@@ -36,6 +36,11 @@
 #include "drm_internal.h"
 #include "drm_crtc_internal.h"
 
+#ifndef __linux__
+#define compat_ptr(x)   ((void *)(unsigned long)x)
+#define ptr_to_compat(x)      ((unsigned long)x)
+#endif
+
 #define DRM_IOCTL_VERSION32		DRM_IOWR(0x00, drm_version32_t)
 #define DRM_IOCTL_GET_UNIQUE32		DRM_IOWR(0x01, drm_unique32_t)
 #define DRM_IOCTL_GET_MAP32		DRM_IOWR(0x04, drm_map32_t)
@@ -73,6 +78,17 @@
 #define DRM_IOCTL_WAIT_VBLANK32		DRM_IOWR(0x3a, drm_wait_vblank32_t)
 
 #define DRM_IOCTL_MODE_ADDFB232		DRM_IOWR(0xb8, drm_mode_fb_cmd232_t)
+
+#ifndef __linux__
+extern int drm_version(struct drm_device *dev, void *data,
+			struct drm_file *file_priv);
+
+extern int drm_getunique(struct drm_device *dev, void *data,
+			struct drm_file *file_priv);
+
+extern int drm_getclient(struct drm_device *dev, void *data,
+			struct drm_file *file_priv);
+#endif
 
 typedef struct drm_version_32 {
 	int version_major;	  /* Major version */
@@ -968,7 +984,6 @@ long drm_compat_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	fn = drm_compat_ioctls[nr].fn;
 	if (!fn)
 		return drm_ioctl(filp, cmd, arg);
-
 	DRM_DEBUG("pid=%d, dev=0x%lx, auth=%d, %s\n",
 		  task_pid_nr(current),
 		  (long)old_encode_dev(file_priv->minor->kdev->devt),

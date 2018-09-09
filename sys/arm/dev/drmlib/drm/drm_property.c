@@ -559,7 +559,11 @@ drm_property_create_blob(struct drm_device *dev, size_t length,
 	if (!length || length > ULONG_MAX - sizeof(struct drm_property_blob))
 		return ERR_PTR(-EINVAL);
 
+#ifdef __linux__
 	blob = kvzalloc(sizeof(struct drm_property_blob)+length, GFP_KERNEL);
+#else
+	blob = kzalloc(sizeof(struct drm_property_blob)+length, GFP_KERNEL);
+#endif
 	if (!blob)
 		return ERR_PTR(-ENOMEM);
 

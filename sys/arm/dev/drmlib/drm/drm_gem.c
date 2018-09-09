@@ -520,6 +520,7 @@ int drm_gem_create_mmap_offset(struct drm_gem_object *obj)
 }
 EXPORT_SYMBOL(drm_gem_create_mmap_offset);
 
+#ifdef __linux__
 /**
  * drm_gem_get_pages - helper to allocate backing pages for a GEM object
  * from shmem
@@ -622,6 +623,7 @@ void drm_gem_put_pages(struct drm_gem_object *obj, struct page **pages,
 	kvfree(pages);
 }
 EXPORT_SYMBOL(drm_gem_put_pages);
+#endif
 
 /**
  * drm_gem_object_lookup - look up a GEM object from it's handle

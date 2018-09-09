@@ -35,7 +35,9 @@
 #include <linux/types.h>
 #include <linux/bitops.h>
 
+#ifdef __linux__
 #include <asm/ioctl.h>
+#endif
 
 struct drm_device;
 struct drm_file;
@@ -67,7 +69,11 @@ typedef int drm_ioctl_t(struct drm_device *dev, void *data,
 typedef int drm_ioctl_compat_t(struct file *filp, unsigned int cmd,
 			       unsigned long arg);
 
-#define DRM_IOCTL_NR(n)                _IOC_NR(n)
+#ifdef __linux__
+#define	DRM_IOCTL_NR(n)                _IOC_NR(n)
+#else
+#define	DRM_IOCTL_NR(n)                ((n) & 0xff)
+#endif
 #define DRM_MAJOR       226
 
 /**

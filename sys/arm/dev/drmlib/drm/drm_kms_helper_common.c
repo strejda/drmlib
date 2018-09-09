@@ -34,6 +34,7 @@ MODULE_AUTHOR("David Airlie, Jesse Barnes");
 MODULE_DESCRIPTION("DRM KMS helper");
 MODULE_LICENSE("GPL and additional rights");
 
+#ifdef __linux__ // BSD don't have struct kernel_param and don't need backward compatibility
 #if IS_ENABLED(CONFIG_DRM_LOAD_EDID_FIRMWARE)
 
 /* Backward compatibility for drm_kms_helper.edid_firmware */
@@ -59,6 +60,7 @@ __MODULE_PARM_TYPE(edid_firmware, "charp");
 MODULE_PARM_DESC(edid_firmware,
 		 "DEPRECATED. Use drm.edid_firmware module parameter instead.");
 
+#endif
 #endif
 
 static int __init drm_kms_helper_init(void)
