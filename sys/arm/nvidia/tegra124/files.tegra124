@@ -40,6 +40,14 @@ arm/nvidia/drm2/tegra_dc_if.m		optional	drm2
 arm/nvidia/drm2/tegra_dc.c		optional	drm2
 arm/nvidia/drm2/tegra_fb.c		optional	drm2
 arm/nvidia/drm2/tegra_bo.c		optional	drm2
+arm/nvidia/drmlib/tegra_drm_if.m	optional	drmlib
+arm/nvidia/drmlib/tegra_drm_subr.c	optional	drmlib	compile-with "${DRMLIB_C}"
+arm/nvidia/drmlib/tegra_host1x.c	optional	drmlib	compile-with "${DRMLIB_C}"
+arm/nvidia/drmlib/tegra_hdmi.c		optional	drmlib	compile-with "${DRMLIB_C}"
+arm/nvidia/drmlib/tegra_dc_if.m		optional	drmlib
+arm/nvidia/drmlib/tegra_dc.c		optional	drmlib	compile-with "${DRMLIB_C}"
+arm/nvidia/drmlib/tegra_fb.c		optional	drmlib	compile-with "${DRMLIB_C}"
+arm/nvidia/drmlib/tegra_bo.c		optional	drmlib	compile-with "${DRMLIB_C}"
 #
 # Firmware
 #
