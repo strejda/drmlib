@@ -24,7 +24,8 @@ DRMLIB_INCLUDES+= -I${S}/arm/dev/drmlib/drm/include
 DRMLIB_INCLUDES+= -I${S}/arm/dev/drmlib/drm/include/uapi
 DRMLIB_INCLUDES+= -I${S}/arm/dev/drmlib/gpl/include
 DRMLIB_INCLUDES+= -I${S}/arm/dev/drmlib/gpl/include/uapi
-DRMLIB_INCLUDES+= ${LINUXKPI_INCLUDES}
+DRMLIB_INCLUDES+= -I${S}/arm/dev/drmlib/linuxkpi/include/
+#DRMLIB_INCLUDES+= ${LINUXKPI_INCLUDES}
 
 DRMLIB_CFLAGS=	${CFLAGS} ${DRMLIB_INCLUDES}
 DRMLIB_CFLAGS+=	-include ${S}/arm/dev/drmlib/bsd/include/drm/drm_os_freebsd.h
