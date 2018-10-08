@@ -1,6 +1,7 @@
 #ifndef __DRM_ASM_PROCESSOR_H__
 #define __DRM_ASM_PROCESSOR_H__
 
+#include <machine/cpu.h>
 #include <asm/barrier.h>
 
 #define smp_mb()	mb()
