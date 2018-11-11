@@ -43,7 +43,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/extres/clk/clk.h>
 #include <dev/extres/hwreset/hwreset.h>
-#include <dev/extres/phy/phy.h>
+#include <dev/extres/phy/phy_usb.h>
 #include <dev/extres/regulator/regulator.h>
 #include <dev/fdt/fdt_pinctrl.h>
 #include <dev/ofw/openfirm.h>
@@ -297,13 +297,17 @@ static struct ofw_compat_data compat_data[] = {
 
  /* Phy controller class and methods. */
 static int usbphy_phy_enable(struct phynode *phy, bool enable);
-static phynode_method_t usbphy_phynode_methods[] = {
-	PHYNODEMETHOD(phynode_enable, usbphy_phy_enable),
+static int usbphy_set_mode(struct phynode *phy, int usb_mode);
+static int usbphy_get_mode(struct phynode *phy, int *usb_mode);
+static phynode_usb_method_t usbphy_phynode_methods[] = {
+	PHYNODEUSBMETHOD(phynode_enable, usbphy_phy_enable),
+	PHYNODEUSBMETHOD(phynode_usb_set_mode, usbphy_set_mode),
+	PHYNODEUSBMETHOD(phynode_usb_get_mode, usbphy_get_mode),
 
-	PHYNODEMETHOD_END
+	PHYNODEUSBMETHOD_END
 };
 DEFINE_CLASS_1(usbphy_phynode, usbphy_phynode_class, usbphy_phynode_methods,
-    0, phynode_class);
+    sizeof(struct phynode_usb_sc), phynode_usb_class);
 
 #define	RD4(sc, offs)							\
 	 bus_read_4(sc->mem_res, offs)
@@ -580,6 +584,27 @@ usbphy_phy_enable(struct phynode *phy, bool enable)
 	return (rv);
 }
 
+static int 
+usbphy_set_mode(struct phynode *phy, int usb_mode)
+{
+	/* TODO: Implement me !!! */
+	return (0);
+}
+
+static int
+usbphy_get_mode(struct phynode *phy, int *usb_mode)
+{
+	device_t dev;
+	struct usbphy_softc *sc;
+
+	dev = phynode_get_device(phy);
+	sc = device_get_softc(dev);
+
+	*usb_mode = sc->dr_mode;
+	return (0);
+}
+
+
 static enum usb_ifc_type
 usb_get_ifc_mode(device_t dev, phandle_t node, char *name)
 {
@@ -710,7 +735,7 @@ usbphy_attach(device_t dev)
 	int rid, rv;
 	phandle_t node;
 	struct phynode *phynode;
-	struct phynode_init_def phy_init;
+	struct phynode_usb_init_def phy_init;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -812,14 +837,15 @@ usbphy_attach(device_t dev)
 
 	/* Create and register phy. */
 	bzero(&phy_init, sizeof(phy_init));
-	phy_init.id = 1;
-	phy_init.ofw_node = node;
-	phynode = phynode_create(dev, &usbphy_phynode_class, &phy_init);
+	phy_init.phynode_init_def.id = 1;
+	phy_init.phynode_init_def.ofw_node = node;
+//	phynode_usb_parse_ofw_stdparam(sc->dev, node, &phy_init);
+	phynode = phynode_usb_create(dev, &usbphy_phynode_class, &phy_init);
 	if (phynode == NULL) {
 		device_printf(sc->dev, "Cannot create phy\n");
 		return (ENXIO);
 	}
-	if (phynode_register(phynode) == NULL) {
+	if (phynode_usb_register(phynode) == NULL) {
 		device_printf(sc->dev, "Cannot create phy\n");
 		return (ENXIO);
 	}
