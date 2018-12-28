@@ -1,57 +1,180 @@
-/*
- * drivers/dma-buf/sync_file.c
- *
- * Copyright (C) 2012 Google, Inc.
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-#include <linux/export.h>
-#include <linux/file.h>
-#include <linux/fs.h>
-#include <linux/kernel.h>
-#include <linux/poll.h>
-#include <linux/sched.h>
-#include <linux/slab.h>
-#include <asm/uaccess.h>
-#include <linux/anon_inodes.h>
+#include <sys/param.h>
+#include <sys/capsicum.h>
+#include <sys/fcntl.h>
+#include <sys/file.h>
+#include <sys/filedesc.h>
+#include <sys/filio.h>
+#include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/mutex.h>
+#include <sys/poll.h>
+#include <sys/systm.h>
+#include <sys/unistd.h>
+
+#include <machine/atomic.h>
+
 #include <linux/sync_file.h>
 #include <uapi/linux/sync_file.h>
 
-static const struct file_operations sync_file_fops;
 
-static struct sync_file *sync_file_alloc(void)
+MALLOC_DEFINE(M_SYNCFILE, "syncfile", "sync file allocator");
+
+static fo_close_t syncfile_fop_close;
+static fo_ioctl_t syncfile_fop_ioctl;
+static fo_poll_t syncfile_fop_poll;
+
+static struct fileops syncfile_fileops = {
+	.fo_close = syncfile_fop_close,
+	.fo_ioctl = syncfile_fop_ioctl,
+	.fo_poll = syncfile_fop_poll,
+	.fo_flags = DFLAG_PASSABLE,
+};
+
+#define	DTYPE_SYNCFILE		101	/* XXX */
+#define	file_is_syncfile(file)	((file)->f_ops == &syncfile_fileops)
+
+static struct sync_file 
+*sync_file_alloc(void)
 {
-	struct sync_file *sync_file;
+	struct sync_file *sf;
+	int rv;
 
-	sync_file = kzalloc(sizeof(*sync_file), GFP_KERNEL);
-	if (!sync_file)
-		return NULL;
+	sf = malloc(sizeof(struct sync_file), M_SYNCFILE, M_WAITOK | M_ZERO);
 
-	sync_file->file = anon_inode_getfile("sync_file", &sync_file_fops,
-					     sync_file, 0);
-	if (IS_ERR(sync_file->file))
-		goto err;
+//	init_waitqueue_head(&sf->wq);
 
-	init_waitqueue_head(&sync_file->wq);
+//	INIT_LIST_HEAD(&sf->cb.node);
+	rv = falloc_noinstall(curthread, &sf->sf_file);
+	if (rv != 0) {
+		free(sf, M_SYNCFILE);
+		return (NULL);
+	}
 
-	INIT_LIST_HEAD(&sync_file->cb.node);
+	finit(sf->sf_file, O_CLOEXEC, DTYPE_SYNCFILE, sf,
+	    &syncfile_fileops);
 
-	return sync_file;
 
-err:
-	kfree(sync_file);
-	return NULL;
+	return (sf);
+
 }
 
+struct sync_file *
+sync_file_create(struct dma_fence *fence)
+{
+	struct sync_file *sf;
+
+	sf = sync_file_alloc();
+	if (sf == NULL)
+		return (NULL);
+
+	sf->fence = dma_fence_get(fence);
+	return (sf);
+}
+
+static struct sync_file *
+sync_file_fdget(int fd)
+{
+	struct file *file;
+	cap_rights_t rights;
+	int rv;
+	
+	CAP_ALL(&rights);
+	rv = fget(curthread, fd, &rights, &file);
+	if (rv != 0)
+		return (NULL);
+
+	if (!file_is_syncfile(file)) {
+		fdrop(file, curthread);
+		return (NULL);
+	}
+
+	return (file->f_data);
+}
+
+struct dma_fence *
+sync_file_get_fence(int fd)
+{
+	struct sync_file *sf;
+	struct dma_fence *fence;
+	
+	sf = sync_file_fdget(fd);
+	if (sf == NULL)
+		return (NULL);
+
+	fence = dma_fence_get(sf->fence);
+	fdrop(sf->sf_file, curthread);
+
+	return (fence);
+}
+
+static int
+syncfile_fop_close(struct file *file, struct thread *td)
+{
+	struct sync_file *sf;
+
+	if (!file_is_syncfile(file))
+		return (EINVAL);
+	sf = file->f_data;
+
+	if (test_bit(POLL_ENABLED, &sf->flags))
+		dma_fence_remove_callback(sf->fence, &sf->cb);
+	dma_fence_put(sf->fence);
+
+	free(sf, M_SYNCFILE);
+	return (0);
+}
+static int
+syncfile_fop_poll(struct file *file, int events, struct ucred *active_cred,
+    struct thread *td)
+{
+	struct sync_file *sf;
+
+	if (!file_is_syncfile(file))
+		return (EINVAL);
+	sf = file->f_data;
+panic("Implement %s", __func__);
+//	poll_wait(file, &sync_file->wq, wait);
+
+//	if (list_empty(&sync_file->cb.node) &&
+//	    !test_and_set_bit(POLL_ENABLED, &sync_file->flags)) {
+//		if (dma_fence_add_callback(sync_file->fence, &sync_file->cb,
+//					   fence_check_cb_func) < 0)
+//			wake_up_all(&sync_file->wq);
+//	}
+
+	return (dma_fence_is_signaled(sf->fence) ? POLLIN : 0);
+			
+}
+
+static int
+syncfile_fop_ioctl(struct file *file, u_long com, void *data,
+	      struct ucred *active_cred, struct thread *td)
+{
+	struct sync_file *sf;
+
+	if (!file_is_syncfile(file))
+		return (EINVAL);
+	sf = file->f_data;
+		
+panic("Implement %s", __func__);
+
+	switch (com) {
+	case SYNC_IOC_MERGE:
+//		return (syncfile_ioctl_merge(sync_file, arg));
+
+	case SYNC_IOC_FILE_INFO:
+//		return (syncfile_ioctl_fence_info(sync_file, arg));
+
+	default:
+		return (ENOTTY);
+	}
+}
+
+
+#if 0
 static void fence_check_cb_func(struct dma_fence *f, struct dma_fence_cb *cb)
 {
 	struct sync_file *sync_file;
@@ -61,68 +184,6 @@ static void fence_check_cb_func(struct dma_fence *f, struct dma_fence_cb *cb)
 	wake_up_all(&sync_file->wq);
 }
 
-/**
- * sync_file_create() - creates a sync file
- * @fence:	fence to add to the sync_fence
- *
- * Creates a sync_file containg @fence. This function acquires and additional
- * reference of @fence for the newly-created &sync_file, if it succeeds. The
- * sync_file can be released with fput(sync_file->file). Returns the
- * sync_file or NULL in case of error.
- */
-struct sync_file *sync_file_create(struct dma_fence *fence)
-{
-	struct sync_file *sync_file;
-
-	sync_file = sync_file_alloc();
-	if (!sync_file)
-		return NULL;
-
-	sync_file->fence = dma_fence_get(fence);
-
-	return sync_file;
-}
-EXPORT_SYMBOL(sync_file_create);
-
-static struct sync_file *sync_file_fdget(int fd)
-{
-	struct file *file = fget(fd);
-
-	if (!file)
-		return NULL;
-
-	if (file->f_op != &sync_file_fops)
-		goto err;
-
-	return file->private_data;
-
-err:
-	fput(file);
-	return NULL;
-}
-
-/**
- * sync_file_get_fence - get the fence related to the sync_file fd
- * @fd:		sync_file fd to get the fence from
- *
- * Ensures @fd references a valid sync_file and returns a fence that
- * represents all fence in the sync_file. On error NULL is returned.
- */
-struct dma_fence *sync_file_get_fence(int fd)
-{
-	struct sync_file *sync_file;
-	struct dma_fence *fence;
-
-	sync_file = sync_file_fdget(fd);
-	if (!sync_file)
-		return NULL;
-
-	fence = dma_fence_get(sync_file->fence);
-	fput(sync_file->file);
-
-	return fence;
-}
-EXPORT_SYMBOL(sync_file_get_fence);
 
 /**
  * sync_file_get_name - get the name of the sync_file
@@ -300,18 +361,6 @@ err:
 
 }
 
-static int sync_file_release(struct inode *inode, struct file *file)
-{
-	struct sync_file *sync_file = file->private_data;
-
-	if (test_bit(POLL_ENABLED, &sync_file->flags))
-		dma_fence_remove_callback(sync_file->fence, &sync_file->cb);
-	dma_fence_put(sync_file->fence);
-	anon_inode_release(file);
-	kfree(sync_file);
-
-	return 0;
-}
 
 static unsigned int sync_file_poll(struct file *file, poll_table *wait)
 {
@@ -467,27 +516,5 @@ out:
 
 	return ret;
 }
+#endif
 
-static long sync_file_ioctl(struct file *file, unsigned int cmd,
-			    unsigned long arg)
-{
-	struct sync_file *sync_file = file->private_data;
-
-	switch (cmd) {
-	case SYNC_IOC_MERGE:
-		return sync_file_ioctl_merge(sync_file, arg);
-
-	case SYNC_IOC_FILE_INFO:
-		return sync_file_ioctl_fence_info(sync_file, arg);
-
-	default:
-		return -ENOTTY;
-	}
-}
-
-static const struct file_operations sync_file_fops = {
-	.release = sync_file_release,
-	.poll = sync_file_poll,
-	.unlocked_ioctl = sync_file_ioctl,
-	.compat_ioctl = sync_file_ioctl,
-};

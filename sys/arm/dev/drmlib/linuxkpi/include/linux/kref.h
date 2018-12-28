@@ -114,4 +114,22 @@ static inline int kref_put_mutex(struct kref *kref,
 	return 0;
 }
 
+/*
+* Not native to Linux.  Mostly used for assertions...
+*/
+static inline bool
+kref_referenced_p(struct kref *kref)
+{
+
+	return (0 < kref->refcount.counter);
+}
+
+static inline bool
+kref_exclusive_p(struct kref *kref)
+{
+
+	MPASS(0 < kref->refcount.counter);
+	return (kref->refcount.counter == 1);
+}
+
 #endif /* _LINUX_KREF_H_ */

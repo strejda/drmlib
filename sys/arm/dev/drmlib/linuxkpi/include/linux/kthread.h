@@ -58,7 +58,6 @@ void linux_kthread_unpark(struct task_struct *);
 void linux_kthread_fn(void *);
 struct task_struct *linux_kthread_setup_and_run(struct thread *,
     linux_task_fn_t *, void *arg);
-int linux_in_atomic(void);
 
 #define	kthread_stop(task)		linux_kthread_stop(task)
 #define	kthread_should_stop()		linux_kthread_should_stop()
@@ -67,7 +66,5 @@ int linux_in_atomic(void);
 #define	kthread_parkme()		linux_kthread_parkme()
 #define	kthread_should_park()		linux_kthread_should_park()
 #define	kthread_unpark(task)		linux_kthread_unpark(task)
-
-#define	in_atomic()			linux_in_atomic()
 
 #endif /* _LINUX_KTHREAD_H_ */

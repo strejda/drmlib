@@ -80,6 +80,7 @@ __FBSDID("$FreeBSD$");
 #include <linux/compat.h>
 #include <linux/poll.h>
 #include <linux/smp.h>
+#include <linux/preempt.h>
 
 #if defined(__i386__) || defined(__amd64__)
 #include <asm/smp.h>
