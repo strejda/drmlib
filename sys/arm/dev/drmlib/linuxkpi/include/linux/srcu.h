@@ -32,6 +32,11 @@
 struct srcu_struct {
 };
 
+#define	__DEFINE_SRCU(name, is_static)					\
+	is_static struct srcu_struct name;
+#define	DEFINE_SRCU(name)		__DEFINE_SRCU(name, )
+#define	DEFINE_STATIC_SRCU(name)	__DEFINE_SRCU(name, static)
+
 #define	srcu_dereference(ptr,srcu)	((__typeof(*(ptr)) *)(ptr))
 
 /* prototypes */

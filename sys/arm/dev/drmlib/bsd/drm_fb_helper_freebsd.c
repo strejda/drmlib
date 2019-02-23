@@ -63,10 +63,6 @@ static DEFINE_MUTEX(kernel_fb_helper_lock);
 #include <sys/param.h>
 #include <sys/systm.h>
 
-//struct vt_kms_softc {
-//	struct drm_fb_helper	*fb_helper;
-//	struct task		 fb_mode_task;
-//};
 
 /* Call restore out of vt(9) locks. */
 
@@ -91,10 +87,10 @@ vt_kms_postswitch(void *arg)
 printf("%s: Enter\n", __func__);
 	sc = (struct vt_kms_softc *)arg;
 
-	if (!kdb_active && panicstr == NULL)
-		taskqueue_enqueue(taskqueue_thread, &sc->fb_mode_task);
-	else
-		drm_fb_helper_restore_fbdev_mode_unlocked(sc->fb_helper);
+//	if (!kdb_active && panicstr == NULL)
+//		taskqueue_enqueue(taskqueue_thread, &sc->fb_mode_task);
+//	else
+//		drm_fb_helper_restore_fbdev_mode_unlocked(sc->fb_helper);
 
 printf("%s: End\n", __func__);
 	return (0);
@@ -1183,7 +1179,7 @@ void drm_fb_helper_fill_var(struct fb_info *info, struct drm_fb_helper *fb_helpe
 	struct drm_framebuffer *fb = fb_helper->fb;
 	struct vt_kms_softc *sc;
 
-	info->fb_name = device_get_nameunit(fb_helper->dev->dev->bsddev);
+	info->fb_name = device_get_nameunit(fb_helper->dev->dev);
 	info->fb_width = fb->width;
 	info->fb_height = fb->height;
 	info->fb_depth = fb->format->cpp[0] * 8;
@@ -1767,7 +1763,7 @@ printf("%s: End 1: %d\n", __func__, ret);
 	info = fb_helper->fbdev;
 
 
-	info->fb_video_dev = device_get_parent(fb_helper->dev->dev->bsddev);
+	info->fb_video_dev = device_get_parent(fb_helper->dev->dev);
 	info->fb_bpp = bpp_sel;
 
 	/* Need to drop locks to avoid recursive deadlock in

@@ -103,7 +103,7 @@ struct vm_area_struct {
 	struct mm_struct *vm_mm;
 	void   *vm_private_data;
 	const struct vm_operations_struct *vm_ops;
-	struct linux_file *vm_file;
+	struct file *vm_file;
 
 	/* internal operation */
 	vm_paddr_t vm_pfn;		/* PFN for memory map */

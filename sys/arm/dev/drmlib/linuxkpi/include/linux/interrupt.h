@@ -42,6 +42,7 @@ typedef	irqreturn_t	(*irq_handler_t)(int, void *);
 
 #define	IRQF_SHARED	RF_SHAREABLE
 
+#if 0
 struct irq_ent {
 	struct list_head	links;
 	struct device	*dev;
@@ -180,6 +181,7 @@ free_irq(unsigned int irq, void *device)
 	list_del(&irqe->links);
 	kfree(irqe);
 }
+#endif
 
 /*
  * LinuxKPI tasklet support

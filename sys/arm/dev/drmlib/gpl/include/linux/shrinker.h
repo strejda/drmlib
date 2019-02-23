@@ -51,14 +51,14 @@ struct shrinker {
 
 //extern int register_shrinker(struct shrinker *);
 //extern void unregister_shrinker(struct shrinker *);
-static int
+static inline int
 register_shrinker(struct shrinker *s)
 {
 
 	return (0);
 };
 
-static void
+static inline void
 unregister_shrinker(struct shrinker *s)
 {
 

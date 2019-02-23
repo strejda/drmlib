@@ -36,41 +36,4 @@
 #include <linux/device.h>
 #include <linux/cdev.h>
 
-struct miscdevice  {
-	const char	*name;
-	struct device	*this_device;
-	const struct file_operations *fops;
-	struct cdev	*cdev;
-	int		minor;
-	const char *nodename;
-	umode_t mode;
-};
-
-extern struct class linux_class_misc;
-
-static inline int
-misc_register(struct miscdevice *misc)
-{
-	misc->this_device = device_create(&linux_class_misc,
-	    &linux_root_device, 0, misc, misc->name);
-	misc->cdev = cdev_alloc();
-	if (misc->cdev == NULL)
-		return -ENOMEM;
-	misc->cdev->owner = THIS_MODULE;
-	misc->cdev->ops = misc->fops;
-	kobject_set_name(&misc->cdev->kobj, misc->name);
-	if (cdev_add(misc->cdev, misc->this_device->devt, 1))
-		return -EINVAL;
-	return (0);
-}
-
-static inline int
-misc_deregister(struct miscdevice *misc)
-{
-	device_destroy(&linux_class_misc, misc->this_device->devt);
-	cdev_del(misc->cdev);
-
-	return (0);
-}
-
 #endif	/* _LINUX_MISCDEVICE_H_ */

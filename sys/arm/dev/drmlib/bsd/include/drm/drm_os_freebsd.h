@@ -28,7 +28,6 @@ MALLOC_DECLARE(DRM_MEM_DRIVER);
 MALLOC_DECLARE(DRM_MEM_KMS);
 
 extern const char *fb_mode_option;
-extern devclass_t drm_devclass;
 
 #define DRM_WAIT_ON( ret, queue, timeout, condition )		\
 do {								\
@@ -56,6 +55,10 @@ do {								\
 
 
 struct drm_minor;
-int drm_dev_alias(struct device *dev, struct drm_minor *minor, const char *minor_str);
+struct drm_device;
+int drm_fbsd_cdev_create(struct drm_minor *minor);
+void drm_fbsd_cdev_delete(struct drm_minor *minor);
+int drm_fbsd_sysctl_cleanup(struct drm_device *dev);
+int drm_fbsd_sysctl_init(struct drm_device *dev);
 
 #endif /* _DRM_OS_FREEBSD_H_ */

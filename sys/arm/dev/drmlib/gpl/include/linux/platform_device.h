@@ -3,9 +3,7 @@
 
 #include <linux/device.h>
 
-struct platform_device {
-	struct device dev;
-};
+struct platform_device;
 
 static inline void
 platform_device_unregister(struct platform_device *pdev)

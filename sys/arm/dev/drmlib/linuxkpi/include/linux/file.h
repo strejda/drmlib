@@ -41,54 +41,13 @@
 #include <linux/fs.h>
 #include <linux/slab.h>
 
-struct linux_file;
-
-#undef file
-
-extern struct fileops linuxfileops;
-
-static inline struct linux_file *
-linux_fget(unsigned int fd)
-{
-	struct file *file;
-
-	/* lookup file pointer by file descriptor index */
-	if (fget_unlocked(curthread->td_proc->p_fd, fd,
-	    &cap_no_rights, &file, NULL) != 0)
-		return (NULL);
-
-	/* check if file handle really belongs to us */
-	if (file->f_data == NULL ||
-	    file->f_ops != &linuxfileops) {
-		fdrop(file, curthread);
-		return (NULL);
-	}
-	return ((struct linux_file *)file->f_data);
-}
-
-extern void linux_file_free(struct linux_file *filp);
-
-static inline void
-fput(struct linux_file *filp)
-{
-	if (refcount_release(filp->_file == NULL ?
-	    &filp->f_count : &filp->_file->f_count)) {
-		linux_file_free(filp);
-	}
-}
-
-static inline unsigned int
-file_count(struct linux_file *filp)
-{
-	return (filp->_file == NULL ?
-	    filp->f_count : filp->_file->f_count);
-}
 
 static inline void
 put_unused_fd(unsigned int fd)
 {
 	struct file *file;
 
+	panic("%s: Not implemented yet.", __func__);
 	if (fget_unlocked(curthread->td_proc->p_fd, fd,
 	    &cap_no_rights, &file, NULL) != 0) {
 		return;
@@ -104,87 +63,54 @@ put_unused_fd(unsigned int fd)
 	fdrop(file, curthread);
 }
 
-static inline void
-fd_install(unsigned int fd, struct linux_file *filp)
-{
-	struct file *file;
-
-	if (fget_unlocked(curthread->td_proc->p_fd, fd,
-	    &cap_no_rights, &file, NULL) != 0) {
-		filp->_file = NULL;
-	} else {
-		filp->_file = file;
-		finit(file, filp->f_mode, DTYPE_DEV, filp, &linuxfileops);
-
-		/* transfer reference count from "filp" to "file" */
-		while (refcount_release(&filp->f_count) == 0)
-			refcount_acquire(&file->f_count);
-	}
-
-	/* drop the extra reference */
-	fput(filp);
-}
-
 static inline int
 get_unused_fd(void)
 {
 	struct file *file;
-	int error;
+	int rv;
 	int fd;
 
-	error = falloc(curthread, &file, &fd, 0);
-	if (error)
-		return -error;
+	panic("%s: Not implemented yet.", __func__);
+	rv = falloc(curthread, &file, &fd, 0);
+	if (rv)
+		return (-rv);
 	/* drop the extra reference */
 	fdrop(file, curthread);
-	return fd;
+	return (fd);
 }
 
 static inline int
 get_unused_fd_flags(int flags)
 {
 	struct file *file;
-	int error;
+	int rv;
 	int fd;
 
-	error = falloc(curthread, &file, &fd, flags);
-	if (error)
-		return -error;
+	panic("%s: Not implemented yet.", __func__);
+	rv = falloc(curthread, &file, &fd, flags);
+	if (rv)
+		return (-rv);
 	/* drop the extra reference */
 	fdrop(file, curthread);
-	return fd;
+	return (fd);
 }
 
-extern struct linux_file *linux_file_alloc(void);
-
-static inline struct linux_file *
-alloc_file(int mode, const struct file_operations *fops)
+static inline void
+fd_install(unsigned int fd, struct file *file)
 {
-	struct linux_file *filp;
-
-	filp = linux_file_alloc();
-	filp->f_op = fops;
-	filp->f_mode = mode;
-
-	return (filp);
+	panic("%s: Not implemented yet.", __func__);
 }
 
-struct fd {
-	struct linux_file *linux_file;
-};
-
-static inline void fdput(struct fd fd)
+static inline void
+fput(struct file *file)
 {
-	fput(fd.linux_file);
-}
 
-static inline struct fd fdget(unsigned int fd)
-{
-	struct linux_file *f = linux_fget(fd);
-	return (struct fd){f};
+	if (refcount_release(&file->f_count)) {
+		if (file->f_ops != NULL)
+			_fdrop(file, curthread);
+//		else
+//			vm_object_deallocate(filp->f_shmem);
+	}
 }
-
-#define	file		linux_file
-#define	fget(...)	linux_fget(__VA_ARGS__)
 
 #endif	/* _LINUX_FILE_H_ */

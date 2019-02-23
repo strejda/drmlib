@@ -7,7 +7,20 @@
 #include <sys/rman.h>
 #include <machine/resource.h>
 
+#include <linux/list.h>
+#include <linux/dmapool.h>
+#include <linux/dma-mapping.h>
+#include <linux/compiler.h>
+#include <linux/errno.h>
+#include <asm/atomic.h>
+#include <linux/device.h>
+
+struct pci_dev;
+struct pci_driver;
+struct pci_device_id;
+
 #include_next <linux/pci.h>
+#if 0
 
 #define	DEFINE_RES_MEM(_start, _size)		\
 	{					\
@@ -170,5 +183,5 @@ pcie_get_readrq(struct pci_dev *dev)
 
 	return 128 << ((ctl & PCI_EXP_DEVCTL_READRQ) >> 12);
 }
-
+#endif
 #endif /* _LINUX_GPLV2_PCI_H_ */

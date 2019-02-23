@@ -175,7 +175,7 @@ drm_add_busid_modesetting(struct drm_device *dev, struct sysctl_ctx_list *ctx,
 	device_t bsddev;
 	int domain, bus, slot, func;
 
-	bsddev = dev->dev->bsddev;
+	bsddev = dev->dev;
 	domain = pci_get_domain(bsddev);
 	bus    = pci_get_bus(bsddev);
 	slot   = pci_get_slot(bsddev);
@@ -217,7 +217,7 @@ static int drm_name_info DRM_SYSCTL_HANDLER_ARGS
 	/* FIXME: This still uses primary minor. */
 	minor = dev->primary;
 	DRM_SYSCTL_PRINT("%s 0x%jx", dev->driver->name,
-	    (uintmax_t)dev2udev((struct cdev *)minor->bsd_device));
+	    (uintmax_t)dev2udev((struct cdev *)minor->kdev));
 
 	mutex_lock(&dev->struct_mutex);
 	master = dev->master;
@@ -404,11 +404,11 @@ static int drm_clients_info DRM_SYSCTL_HANDLER_ARGS
 		priv = &tempprivs[i];
 		DRM_SYSCTL_PRINT("%c %-12s %5d %5d %10u %10lu\n",
 			       priv->authenticated ? 'y' : 'n',
-			       devtoname((struct cdev *)priv->minor->bsd_device),
+			       devtoname((struct cdev *)priv->minor->kdev),
 			       priv->pid,
 				 0,
 			       priv->magic,
-			       priv->ioctl_count);
+			       0UL);
 	}
 
 	SYSCTL_OUT(req, "", 1);

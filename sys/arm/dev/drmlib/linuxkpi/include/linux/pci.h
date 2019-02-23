@@ -53,6 +53,11 @@
 #include <asm/atomic.h>
 #include <linux/device.h>
 
+struct pci_dev;
+struct pci_driver;
+struct pci_device_id;
+
+#if 0
 struct pci_device_id {
 	uint32_t	vendor;
 	uint32_t	device;
@@ -847,5 +852,6 @@ pci_num_vf(struct pci_dev *dev)
 {
 	return (0);
 }
+#endif
 
 #endif	/* _LINUX_PCI_H_ */

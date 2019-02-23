@@ -55,6 +55,48 @@ enum dma_data_direction {
 	DMA_NONE = 3,
 };
 
+static inline int
+dma_map_sg_attrs(struct device *dev, struct scatterlist *sgl, int nents,
+    enum dma_data_direction dir, struct dma_attrs *attrs)
+{
+	panic("%s: Not implemenred yet.", __func__);
+}
+
+static inline void
+dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
+    enum dma_data_direction direction)
+{
+	panic("%s: Not implemenred yet.", __func__);
+}
+
+static inline dma_addr_t
+dma_map_page(struct device *dev, struct page *page,
+    unsigned long offset, size_t size, enum dma_data_direction direction)
+{
+	panic("%s: Not implemenred yet.", __func__);
+}
+
+static inline int
+dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+{
+	panic("%s: Not implemenred yet.", __func__);
+}
+
+static inline void *
+dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
+    gfp_t flag)
+{
+	panic("%s: Not implemenred yet.", __func__);
+}
+
+static inline void
+dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
+    dma_addr_t dma_handle)
+{
+	panic("%s: Not implemenred yet.", __func__);
+}
+
+#if 0
 struct dma_map_ops {
 	void* (*alloc_coherent)(struct device *dev, size_t size,
 	    dma_addr_t *dma_handle, gfp_t gfp);
@@ -278,5 +320,6 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
 
 extern int uma_align_cache;
 #define	dma_get_cache_alignment()	uma_align_cache
+#endif
 
 #endif	/* _LINUX_DMA_MAPPING_H_ */
