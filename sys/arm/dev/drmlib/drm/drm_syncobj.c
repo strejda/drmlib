@@ -385,7 +385,7 @@ static int drm_syncobj_destroy(struct drm_file *file_private,
 	drm_syncobj_put(syncobj);
 	return 0;
 }
-
+#ifdef __linux__
 static int drm_syncobj_file_release(struct inode *inode, struct file *file)
 {
 	struct drm_syncobj *syncobj = file->private_data;
@@ -397,6 +397,21 @@ static int drm_syncobj_file_release(struct inode *inode, struct file *file)
 static const struct file_operations drm_syncobj_file_fops = {
 	.release = drm_syncobj_file_release,
 };
+
+#else
+static int drm_syncobj_file_close(struct file *file, struct thread *td)
+{
+	struct drm_syncobj *syncobj = file->f_data;
+
+	drm_syncobj_put(syncobj);
+	return 0;
+}
+
+static struct fileops drm_syncobj_file_fops = {
+	.fo_close = drm_syncobj_file_close,
+};
+
+#endif
 
 /**
  * drm_syncobj_get_fd - get a file descriptor from a syncobj
@@ -412,6 +427,7 @@ int drm_syncobj_get_fd(struct drm_syncobj *syncobj, int *p_fd)
 	struct file *file;
 	int fd;
 
+#ifdef __linux__
 	fd = get_unused_fd_flags(O_CLOEXEC);
 	if (fd < 0)
 		return fd;
@@ -423,9 +439,25 @@ int drm_syncobj_get_fd(struct drm_syncobj *syncobj, int *p_fd)
 		put_unused_fd(fd);
 		return PTR_ERR(file);
 	}
-
 	drm_syncobj_get(syncobj);
 	fd_install(fd, file);
+#else
+#define DTYPE_SYNCOBJ 104
+	int rv;
+	rv = falloc_noinstall(curthread, &file);
+	if (rv != 0) {
+		return (-rv);
+	}
+
+	finit(file, O_CLOEXEC, DTYPE_SYNCOBJ, syncobj,
+	    &drm_syncobj_file_fops);
+	drm_syncobj_get(syncobj);
+	rv = finstall(curthread,file, &fd, O_CLOEXEC, NULL);
+	if (rv != 0) {
+		drm_syncobj_put(syncobj);
+		return (-rv);
+	}
+#endif
 
 	*p_fd = fd;
 	return 0;
@@ -453,6 +485,7 @@ static int drm_syncobj_fd_to_handle(struct drm_file *file_private,
 	struct file *file;
 	int ret;
 
+#ifdef __linux__
 	file = fget(fd);
 	if (!file)
 		return -EINVAL;
@@ -461,9 +494,22 @@ static int drm_syncobj_fd_to_handle(struct drm_file *file_private,
 		fput(file);
 		return -EINVAL;
 	}
-
 	/* take a reference to put in the idr */
 	syncobj = file->private_data;
+#else
+	cap_rights_t rights;
+
+	CAP_ALL(&rights);
+	ret = fget(curthread, fd, &rights, &file);
+	if (ret != 0)
+		return -EINVAL;
+	if (file->f_ops != &drm_syncobj_file_fops) {
+		fdrop(file, curthread);
+		return -EINVAL;
+	}
+	/* take a reference to put in the idr */
+	syncobj = file->f_data;
+#endif
 	drm_syncobj_get(syncobj);
 
 	idr_preload(GFP_KERNEL);

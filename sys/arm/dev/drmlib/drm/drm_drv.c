@@ -78,9 +78,7 @@ static bool drm_core_init_complete = false;
 
 static struct dentry *drm_debugfs_root;
 
-#ifdef __linux__
 DEFINE_STATIC_SRCU(drm_unplug_srcu);
-#endif
 
 /*
  * DRM Minors
@@ -136,19 +134,22 @@ static int drm_minor_alloc(struct drm_device *dev, unsigned int type)
 
 	minor->index = r;
 
+#ifdef __linux__
 	minor->kdev = drm_sysfs_minor_alloc(minor);
 	if (IS_ERR(minor->kdev)) {
 		r = PTR_ERR(minor->kdev);
 		goto err_index;
 	}
-
+#endif
 	*drm_minor_get_slot(dev, type) = minor;
 	return 0;
 
+#ifdef __linux__
 err_index:
 	spin_lock_irqsave(&drm_minor_lock, flags);
 	idr_remove(&drm_minors_idr, minor->index);
 	spin_unlock_irqrestore(&drm_minor_lock, flags);
+#endif
 err_free:
 	kfree(minor);
 	return r;
@@ -164,8 +165,9 @@ static void drm_minor_free(struct drm_device *dev, unsigned int type)
 	if (!minor)
 		return;
 
+#ifdef __linux__
 	put_device(minor->kdev);
-
+#endif
 	spin_lock_irqsave(&drm_minor_lock, flags);
 	idr_remove(&drm_minors_idr, minor->index);
 	spin_unlock_irqrestore(&drm_minor_lock, flags);
@@ -192,10 +194,15 @@ static int drm_minor_register(struct drm_device *dev, unsigned int type)
 		goto err_debugfs;
 	}
 
+#ifdef __linux__
 	ret = device_add(minor->kdev);
 	if (ret)
 		goto err_debugfs;
-
+#else
+	ret = drm_fbsd_cdev_create(minor);
+	if (ret)
+		goto err_debugfs;
+#endif
 	/* replace NULL with @minor so lookups will succeed from now on */
 	spin_lock_irqsave(&drm_minor_lock, flags);
 	idr_replace(&drm_minors_idr, minor, minor->index);
@@ -215,16 +222,26 @@ static void drm_minor_unregister(struct drm_device *dev, unsigned int type)
 	unsigned long flags;
 
 	minor = *drm_minor_get_slot(dev, type);
+
+#ifdef __linux__
 	if (!minor || !device_is_registered(minor->kdev))
 		return;
+#else
+	if (!minor)
+		return;
+#endif
 
 	/* replace @minor with NULL so lookups will fail from now on */
 	spin_lock_irqsave(&drm_minor_lock, flags);
 	idr_replace(&drm_minors_idr, NULL, minor->index);
 	spin_unlock_irqrestore(&drm_minor_lock, flags);
 
+#ifdef __linux__
 	device_del(minor->kdev);
 	dev_set_drvdata(minor->kdev, NULL); /* safety belt */
+#else
+	drm_fbsd_cdev_delete(minor);
+#endif
 	drm_debugfs_cleanup(minor);
 }
 
@@ -337,14 +354,12 @@ EXPORT_SYMBOL(drm_put_dev);
  */
 bool drm_dev_enter(struct drm_device *dev, int *idx)
 {
-#ifdef __linux__
 	*idx = srcu_read_lock(&drm_unplug_srcu);
 
 	if (dev->unplugged) {
 		srcu_read_unlock(&drm_unplug_srcu, *idx);
 		return false;
 	}
-#endif
 
 	return true;
 }
@@ -359,9 +374,8 @@ EXPORT_SYMBOL(drm_dev_enter);
  */
 void drm_dev_exit(int idx)
 {
-#ifdef __linux__
+
 	srcu_read_unlock(&drm_unplug_srcu, idx);
-#endif
 }
 EXPORT_SYMBOL(drm_dev_exit);
 
@@ -384,9 +398,7 @@ void drm_dev_unplug(struct drm_device *dev)
 	 * finished.
 	 */
 	dev->unplugged = true;
-#ifdef __linux__
 	synchronize_srcu(&drm_unplug_srcu);
-#endif
 
 	drm_dev_unregister(dev);
 
@@ -515,7 +527,6 @@ int drm_dev_init(struct drm_device *dev,
 	kref_init(&dev->ref);
 	dev->dev = parent;
 	dev->driver = driver;
-
 	INIT_LIST_HEAD(&dev->filelist);
 	INIT_LIST_HEAD(&dev->filelist_internal);
 	INIT_LIST_HEAD(&dev->clientlist);
@@ -928,6 +939,7 @@ int drm_dev_set_unique(struct drm_device *dev, const char *name)
 }
 EXPORT_SYMBOL(drm_dev_set_unique);
 
+#ifdef __linux__
 /*
  * DRM Core
  * The DRM core module initializes all global DRM objects and makes them
@@ -991,9 +1003,7 @@ static const struct file_operations drm_stub_fops = {
 static void drm_core_exit(void)
 {
 	unregister_chrdev(DRM_MAJOR, "drm");
-#ifdef __linux__
 	debugfs_remove(drm_debugfs_root);
-#endif
 	drm_sysfs_destroy();
 	idr_destroy(&drm_minors_idr);
 	drm_connector_ida_destroy();
@@ -1014,21 +1024,14 @@ static int __init drm_core_init(void)
 		goto error;
 	}
 
-#ifdef __linux__
 	drm_debugfs_root = debugfs_create_dir("dri", NULL);
 	if (!drm_debugfs_root) {
 		ret = -ENOMEM;
 		DRM_ERROR("Cannot create debugfs-root: %d\n", ret);
 		goto error;
 	}
-#endif
 
-#ifdef __linux__
 	ret = register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops);
-#else
-	ret = register_chrdev_p(DRM_MAJOR, "drm", &drm_stub_fops,
-	    DRM_DEV_UID, DRM_DEV_GID, DRM_DEV_MODE);
-#endif
 	if (ret < 0)
 		goto error;
 
@@ -1041,6 +1044,41 @@ error:
 	drm_core_exit();
 	return ret;
 }
+#else
+static void drm_core_exit(void)
+{
+//	drm_sysctl_exit();
+	idr_destroy(&drm_minors_idr);
+	drm_connector_ida_destroy();
+	drm_global_release();
+}
+
+static int __init drm_core_init(void)
+{
+	int ret;
+
+	drm_global_init();
+	drm_connector_ida_init();
+	idr_init(&drm_minors_idr);
+
+	ret = 0;
+//	ret = drm_sysctl_init();
+	if (ret != 0) {
+		DRM_ERROR("Failed to create hw.dri sysctl entry: %d\n",
+		    ret);
+		goto error;
+	}
+
+	drm_core_init_complete = true;
+
+	DRM_DEBUG("Initialized\n");
+	return 0;
+
+error:
+	drm_core_exit();
+	return ret;
+}
+#endif
 
 module_init(drm_core_init);
 module_exit(drm_core_exit);

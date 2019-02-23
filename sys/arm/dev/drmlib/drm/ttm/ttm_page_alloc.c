@@ -44,9 +44,6 @@
 #include <linux/mm.h>
 #include <linux/seq_file.h> /* for seq_printf */
 #include <linux/slab.h>
-#ifndef __linux__
-#include <linux/shrinker.h>
-#endif
 #include <linux/dma-mapping.h>
 
 #include <linux/atomic.h>

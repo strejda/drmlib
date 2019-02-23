@@ -31,6 +31,7 @@
 #include "drm_internal.h"
 #include "drm_legacy.h"
 
+
 /**
  * drm_pci_alloc - Allocate a PCI consistent memory block, for DMA.
  * @dev: DRM device
@@ -61,7 +62,8 @@ drm_dma_handle_t *drm_pci_alloc(struct drm_device * dev, size_t size, size_t ali
 		return NULL;
 
 	dmah->size = size;
-	dmah->vaddr = dma_alloc_coherent(&dev->pdev->dev, size, &dmah->busaddr, GFP_KERNEL | __GFP_COMP);
+	dmah->vaddr = NULL;
+//	dmah->vaddr = dma_alloc_coherent(&dev->pdev->dev, size, &dmah->busaddr, GFP_KERNEL | __GFP_COMP);
 
 	if (dmah->vaddr == NULL) {
 		kfree(dmah);
@@ -99,8 +101,8 @@ void __drm_legacy_pci_free(struct drm_device * dev, drm_dma_handle_t * dmah)
 		     sz > 0; addr += PAGE_SIZE, sz -= PAGE_SIZE) {
 			ClearPageReserved(virt_to_page((void *)addr));
 		}
-		dma_free_coherent(&dev->pdev->dev, dmah->size, dmah->vaddr,
-				  dmah->busaddr);
+//		dma_free_coherent(&dev->pdev->dev, dmah->size, dmah->vaddr,
+//				  dmah->busaddr);
 	}
 }
 

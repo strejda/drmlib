@@ -38,6 +38,7 @@
 #include <drm/ttm/ttm_module.h>
 #include <drm/drm_sysfs.h>
 
+#if 0
 static DECLARE_WAIT_QUEUE_HEAD(exit_q);
 static atomic_t device_released;
 
@@ -100,6 +101,14 @@ static void __exit ttm_exit(void)
 
 module_init(ttm_init);
 module_exit(ttm_exit);
+
+#else
+struct kobject *ttm_get_kobj(void)
+{
+	panic("%s Not implemented", __func__);
+}
+#endif
+
 
 MODULE_AUTHOR("Thomas Hellstrom, Jerome Glisse");
 MODULE_DESCRIPTION("TTM memory manager subsystem (for DRM device)");

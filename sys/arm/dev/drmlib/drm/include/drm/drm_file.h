@@ -32,9 +32,6 @@
 
 #include <linux/types.h>
 #include <linux/completion.h>
-#ifndef __linux__
-#include <linux/idr.h>
-#endif
 
 #include <uapi/drm/drm.h>
 
@@ -72,13 +69,12 @@ struct drm_minor {
 	/* private: */
 	int index;			/* Minor device number */
 	int type;                       /* Control or render */
+#ifdef __linux__
 	struct device *kdev;		/* Linux device */
-	struct drm_device *dev;
-#ifndef __linux__
-	device_t bsd_kdev; 		/* OS device */
-	struct cdev *bsd_device; 	/* Device number for mknod */
-	struct sigio *buf_sigio; 	/* Processes waiting for SIGIO */
+#else
+	struct cdev *kdev;		/* Linux device */
 #endif
+	struct drm_device *dev;
 
 	struct dentry *debugfs_root;
 
@@ -235,7 +231,6 @@ struct drm_file {
 	struct pid *pid;
 #else
 	pid_t pid;
-	unsigned long ioctl_count;
 #endif
 
 	/** @magic: Authentication magic, see @authenticated. */

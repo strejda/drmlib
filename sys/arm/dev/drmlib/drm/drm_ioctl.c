@@ -761,7 +761,11 @@ static const struct drm_ioctl_desc drm_ioctls[] = {
 long drm_ioctl_kernel(struct file *file, drm_ioctl_t *func, void *kdata,
 		      u32 flags)
 {
+#ifdef __linux__
 	struct drm_file *file_priv = file->private_data;
+#else
+	struct drm_file *file_priv = file->f_data;
+#endif
 	struct drm_device *dev = file_priv->minor->dev;
 	int retcode;
 
@@ -801,7 +805,12 @@ EXPORT_SYMBOL(drm_ioctl_kernel);
 long drm_ioctl(struct file *filp,
 	      unsigned int cmd, unsigned long arg)
 {
+#ifdef __linux__
 	struct drm_file *file_priv = filp->private_data;
+#else
+	struct drm_file *file_priv = filp->f_data;
+#endif
+
 	struct drm_device *dev;
 	const struct drm_ioctl_desc *ioctl = NULL;
 	drm_ioctl_t *func;
@@ -817,7 +826,6 @@ long drm_ioctl(struct file *filp,
 	if (drm_dev_is_unplugged(dev))
 		return -ENODEV;
 	is_driver_ioctl = nr >= DRM_COMMAND_BASE && nr < DRM_COMMAND_END;
-
 	if (is_driver_ioctl) {
 		/* driver ioctl */
 		if (nr - DRM_COMMAND_BASE >= dev->driver->num_ioctls)
@@ -837,11 +845,14 @@ long drm_ioctl(struct file *filp,
 	if ((cmd & ioctl->cmd & IOC_OUT) == 0)
 		out_size = 0;
 	ksize = max(max(in_size, out_size), drv_size);
-
-	DRM_DEBUG("pid=%d, dev=0x%lx, auth=%d, %s\n",
-		  task_pid_nr(current),
-		  (long)old_encode_dev(file_priv->minor->kdev->devt),
+printf("%s: pid=%d, auth=%d, %s\n", __func__, task_pid_nr(current),
+//		  dev_name(file_priv->minor->kdev),
 		  file_priv->authenticated, ioctl->name);
+
+//	DRM_DEBUG("pid=%d, dev=0x%lx, auth=%d, %s\n",
+//		  task_pid_nr(current),
+//		  (long)old_encode_dev(file_priv->minor->kdev->devt),
+//		  file_priv->authenticated, ioctl->name);
 
 	/* Do not trust userspace, use our own definition */
 	func = ioctl->func;
@@ -862,24 +873,32 @@ long drm_ioctl(struct file *filp,
 		}
 	}
 
+#ifdef __linux__
 	if (copy_from_user(kdata, (void __user *)arg, in_size) != 0) {
 		retcode = -EFAULT;
 		goto err_i1;
 	}
+#else
+	memcpy(kdata, (void __user *)arg, in_size);
+#endif
 
 	if (ksize > in_size)
 		memset(kdata + in_size, 0, ksize - in_size);
 
 	retcode = drm_ioctl_kernel(filp, func, kdata, ioctl->flags);
+#ifdef __linux__
 	if (copy_to_user((void __user *)arg, kdata, out_size) != 0)
 		retcode = -EFAULT;
+#else
+	memcpy((void __user *)arg, kdata, out_size);
+#endif
 
       err_i1:
 	if (!ioctl)
-		DRM_DEBUG("invalid ioctl: pid=%d, dev=0x%lx, auth=%d, cmd=0x%02x, nr=0x%02x\n",
-			  task_pid_nr(current),
-			  (long)old_encode_dev(file_priv->minor->kdev->devt),
-			  file_priv->authenticated, cmd, nr);
+//		DRM_DEBUG("invalid ioctl: pid=%d, dev=0x%lx, auth=%d, cmd=0x%02x, nr=0x%02x\n",
+//			  task_pid_nr(current),
+//			  (long)old_encode_dev(file_priv->minor->kdev->devt),
+//			  file_priv->authenticated, cmd, nr);
 
 	if (kdata != stack_kdata)
 		kfree(kdata);

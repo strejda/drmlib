@@ -542,7 +542,9 @@ struct dma_buf *drm_gem_prime_export(struct drm_device *dev,
 {
 	struct dma_buf_export_info exp_info = {
 		.exp_name = KBUILD_MODNAME, /* white lie for debug */
+#ifdef __linux__
 		.owner = dev->driver->fops->owner,
+#endif
 		.ops = &drm_gem_prime_dmabuf_ops,
 		.size = obj->size,
 		.flags = flags,

@@ -222,8 +222,11 @@ void ttm_tt_destroy(struct ttm_tt *ttm)
 
 	if (!(ttm->page_flags & TTM_PAGE_FLAG_PERSISTENT_SWAP) &&
 	    ttm->swap_storage)
+#ifdef __linux__
 		fput(ttm->swap_storage);
-
+#else
+		fdrop(ttm->swap_storage, curthread);
+#endif
 	ttm->swap_storage = NULL;
 	ttm->func->destroy(ttm);
 }
@@ -354,6 +357,8 @@ EXPORT_SYMBOL(ttm_tt_bind);
 
 int ttm_tt_swapin(struct ttm_tt *ttm)
 {
+panic("%s not implemented", __func__);
+#if 0
 #ifdef __linux__
 	struct address_space *swap_space;
 #else
@@ -400,10 +405,14 @@ int ttm_tt_swapin(struct ttm_tt *ttm)
 	return 0;
 out_err:
 	return ret;
+#endif
+return 0;
 }
 
 int ttm_tt_swapout(struct ttm_tt *ttm, struct file *persistent_swap_storage)
 {
+panic("%s not implemented", __func__);
+#if 0
 #ifdef __linux__
 	struct address_space *swap_space;
 #else
@@ -468,6 +477,8 @@ out_err:
 		fput(swap_storage);
 
 	return ret;
+#endif
+return 0;
 }
 
 static void ttm_tt_add_mapping(struct ttm_tt *ttm)

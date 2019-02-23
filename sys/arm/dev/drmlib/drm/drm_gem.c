@@ -816,7 +816,6 @@ drm_gem_object_release(struct drm_gem_object *obj)
 
 	if (obj->filp)
 		fput(obj->filp);
-
 	drm_gem_free_mmap_offset(obj);
 }
 EXPORT_SYMBOL(drm_gem_object_release);
@@ -1000,7 +999,11 @@ EXPORT_SYMBOL(drm_gem_mmap_obj);
  */
 int drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 {
+#ifdef __linux__
 	struct drm_file *priv = filp->private_data;
+#else
+	struct drm_file *priv = filp->f_data;
+#endif
 	struct drm_device *dev = priv->minor->dev;
 	struct drm_gem_object *obj = NULL;
 	struct drm_vma_offset_node *node;

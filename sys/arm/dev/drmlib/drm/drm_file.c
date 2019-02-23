@@ -217,10 +217,10 @@ void drm_file_free(struct drm_file *file)
 
 	dev = file->minor->dev;
 
-	DRM_DEBUG("pid = %d, device = 0x%lx, open_count = %d\n",
-		  task_pid_nr(current),
-		  (long)old_encode_dev(file->minor->kdev->devt),
-		  dev->open_count);
+//	DRM_DEBUG("pid = %d, device = 0x%lx, open_count = %d\n",
+//		  task_pid_nr(current),
+//		  (long)old_encode_dev(file->minor->kdev->devt),
+//		  dev->open_count);
 
 	if (drm_core_check_feature(dev, DRIVER_LEGACY) &&
 	    dev->driver->preclose)
@@ -361,8 +361,13 @@ static int drm_open_helper(struct file *filp, struct drm_minor *minor)
 	struct drm_file *priv;
 	int ret;
 
+#ifdef __linux__
 	if (filp->f_flags & O_EXCL)
 		return -EBUSY;	/* No exclusive opens */
+#else
+	if (filp->f_flag & O_EXCL)
+		return -EBUSY;	/* No exclusive opens */
+#endif
 	if (!drm_cpu_valid())
 		return -EINVAL;
 	if (dev->switch_power_state != DRM_SWITCH_POWER_ON && dev->switch_power_state != DRM_SWITCH_POWER_DYNAMIC_OFF)
@@ -382,8 +387,12 @@ static int drm_open_helper(struct file *filp, struct drm_minor *minor)
 		}
 	}
 
+#ifdef __linux__
 	filp->private_data = priv;
 	filp->f_mode |= FMODE_UNSIGNED_OFFSET;
+#else
+	filp->f_data = priv;
+#endif
 	priv->filp = filp;
 
 	mutex_lock(&dev->filelist_mutex);
@@ -467,7 +476,11 @@ void drm_lastclose(struct drm_device * dev)
  */
 int drm_release(struct inode *inode, struct file *filp)
 {
+#ifdef __linux__
 	struct drm_file *file_priv = filp->private_data;
+#else
+	struct drm_file *file_priv = filp->f_data;
+#endif
 	struct drm_minor *minor = file_priv->minor;
 	struct drm_device *dev = minor->dev;
 
@@ -523,7 +536,11 @@ EXPORT_SYMBOL(drm_release);
 ssize_t drm_read(struct file *filp, char __user *buffer,
 		 size_t count, loff_t *offset)
 {
+#ifdef __linux__
 	struct drm_file *file_priv = filp->private_data;
+#else
+	struct drm_file *file_priv = filp->f_data;
+#endif
 	struct drm_device *dev = file_priv->minor->dev;
 	ssize_t ret;
 
@@ -550,8 +567,13 @@ ssize_t drm_read(struct file *filp, char __user *buffer,
 			if (ret)
 				break;
 
+#ifdef __linux__
 			if (filp->f_flags & O_NONBLOCK) {
 				ret = -EAGAIN;
+#else
+			if (filp->f_flag & O_NONBLOCK) {
+				ret = -EAGAIN;
+#endif
 				break;
 			}
 
@@ -608,10 +630,14 @@ EXPORT_SYMBOL(drm_read);
  */
 __poll_t drm_poll(struct file *filp, struct poll_table_struct *wait)
 {
+#ifdef __linux__
 	struct drm_file *file_priv = filp->private_data;
+#else
+	struct drm_file *file_priv = filp->f_data;
+#endif
 	__poll_t mask = 0;
 
-	poll_wait(filp, &file_priv->event_wait, wait);
+//	poll_wait(filp, &file_priv->event_wait, wait);
 
 	if (!list_empty(&file_priv->event_list))
 #ifdef __linux__

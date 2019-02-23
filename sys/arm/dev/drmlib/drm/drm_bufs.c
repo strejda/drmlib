@@ -1508,7 +1508,7 @@ int __drm_legacy_mapbufs(struct drm_device *dev, void *data, int *p,
 			retcode = vm_mmap(&vms->vm_map, &virtual, map->size,
 			    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_ALL,
 			    MAP_SHARED | MAP_NOSYNC, OBJT_DEVICE,
-			    file_priv->minor->bsd_device, token);
+			    file_priv->minor->kdev, token);
 #endif
 		} else {
 #ifdef __linux__
@@ -1519,7 +1519,7 @@ int __drm_legacy_mapbufs(struct drm_device *dev, void *data, int *p,
 			retcode = vm_mmap(&vms->vm_map, &virtual, dma->byte_count,
 			    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_ALL,
 			    MAP_SHARED | MAP_NOSYNC, OBJT_DEVICE,
-			    file_priv->minor->bsd_device, 0);
+			    file_priv->minor->kdev, 0);
 #endif
 		}
 #ifdef __linux__

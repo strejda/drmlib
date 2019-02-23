@@ -2340,7 +2340,6 @@ static int setup_out_fence(struct drm_out_fence_state *fence_state,
 	fence_state->fd = get_unused_fd_flags(O_CLOEXEC);
 	if (fence_state->fd < 0)
 		return fence_state->fd;
-
 	if (put_user(fence_state->fd, fence_state->out_fence_ptr))
 		return -EFAULT;
 
@@ -2489,8 +2488,7 @@ static void complete_signaling(struct drm_device *dev,
 	if (install_fds) {
 		for (i = 0; i < num_fences; i++)
 			fd_install(fence_state[i].fd,
-				   fence_state[i].sync_file->file);
-
+			   fence_state[i].sync_file->file);
 		kfree(fence_state);
 		return;
 	}
@@ -2516,7 +2514,6 @@ static void complete_signaling(struct drm_device *dev,
 			fput(fence_state[i].sync_file->file);
 		if (fence_state[i].fd >= 0)
 			put_unused_fd(fence_state[i].fd);
-
 		/* If this fails log error to the user */
 		if (fence_state[i].out_fence_ptr &&
 		    put_user(-1, fence_state[i].out_fence_ptr))
