@@ -565,8 +565,8 @@ static bool __must_check get_dma_buf_unless_doomed(struct dma_buf *dmabuf)
 #ifdef __linux__
 	return atomic_long_inc_not_zero(&dmabuf->file->f_count) != 0L;
 #else
-	CTASSERT(sizeof(((struct dma_buf *)0)->file->f_count) == sizeof(atomic_t));
-	return atomic_inc_not_zero((atomic_t *)&dmabuf->file->f_count) != 0L;
+	CTASSERT(sizeof(((struct dma_buf *)0)->db_file->f_count) == sizeof(atomic_t));
+	return atomic_inc_not_zero((atomic_t *)&dmabuf->db_file->f_count) != 0L;
 #endif
 }
 
