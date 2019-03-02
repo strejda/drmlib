@@ -1,5 +1,5 @@
-#ifndef _LINUX__PLATFORM_DEVICE_H_
-#define	_LINUX__PLATFORM_DEVICE_H_
+#ifndef _LINUX_PLATFORM_DEVICE_H_
+#define	_LINUX_PLATFORM_DEVICE_H_
 
 #include <linux/device.h>
 
@@ -20,4 +20,4 @@ platform_device_register_simple(const char *name, int id,
 	panic("%s: unimplemented", __func__);
 }
 
-#endif /* _LINUX__PLATFORM_DEVICE_H_ */
+#endif /* _LINUX_PLATFORM_DEVICE_H_ */

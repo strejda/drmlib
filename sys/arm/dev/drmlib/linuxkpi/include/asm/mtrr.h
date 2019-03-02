@@ -1,5 +1,5 @@
-#ifndef _ASM_X86_MTRR_H
-#define _ASM_X86_MTRR_H
+#ifndef _LINUX_ASM_X86_MTRR_H
+#define _LINUX_ASM_X86_MTRR_H
 
 
 #define MTRR_TYPE_UNCACHABLE 0
@@ -16,4 +16,4 @@ void arch_phys_wc_del(int handle);
 
 #define arch_phys_wc_index(x) (x)
 
-#endif
+#endif /*_LINUX_ASM_X86_MTRR_H */
