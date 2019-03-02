@@ -361,13 +361,8 @@ static int drm_open_helper(struct file *filp, struct drm_minor *minor)
 	struct drm_file *priv;
 	int ret;
 
-#ifdef __linux__
 	if (filp->f_flags & O_EXCL)
 		return -EBUSY;	/* No exclusive opens */
-#else
-	if (filp->f_flag & O_EXCL)
-		return -EBUSY;	/* No exclusive opens */
-#endif
 	if (!drm_cpu_valid())
 		return -EINVAL;
 	if (dev->switch_power_state != DRM_SWITCH_POWER_ON && dev->switch_power_state != DRM_SWITCH_POWER_DYNAMIC_OFF)
@@ -387,12 +382,11 @@ static int drm_open_helper(struct file *filp, struct drm_minor *minor)
 		}
 	}
 
-#ifdef __linux__
 	filp->private_data = priv;
+#ifdef __linux__
 	filp->f_mode |= FMODE_UNSIGNED_OFFSET;
-#else
-	filp->f_data = priv;
 #endif
+	filp->f_data = priv;
 	priv->filp = filp;
 
 	mutex_lock(&dev->filelist_mutex);
@@ -476,11 +470,7 @@ void drm_lastclose(struct drm_device * dev)
  */
 int drm_release(struct inode *inode, struct file *filp)
 {
-#ifdef __linux__
 	struct drm_file *file_priv = filp->private_data;
-#else
-	struct drm_file *file_priv = filp->f_data;
-#endif
 	struct drm_minor *minor = file_priv->minor;
 	struct drm_device *dev = minor->dev;
 
@@ -536,11 +526,7 @@ EXPORT_SYMBOL(drm_release);
 ssize_t drm_read(struct file *filp, char __user *buffer,
 		 size_t count, loff_t *offset)
 {
-#ifdef __linux__
 	struct drm_file *file_priv = filp->private_data;
-#else
-	struct drm_file *file_priv = filp->f_data;
-#endif
 	struct drm_device *dev = file_priv->minor->dev;
 	ssize_t ret;
 
@@ -567,13 +553,8 @@ ssize_t drm_read(struct file *filp, char __user *buffer,
 			if (ret)
 				break;
 
-#ifdef __linux__
 			if (filp->f_flags & O_NONBLOCK) {
 				ret = -EAGAIN;
-#else
-			if (filp->f_flag & O_NONBLOCK) {
-				ret = -EAGAIN;
-#endif
 				break;
 			}
 
@@ -632,21 +613,33 @@ __poll_t drm_poll(struct file *filp, struct poll_table_struct *wait)
 {
 #ifdef __linux__
 	struct drm_file *file_priv = filp->private_data;
-#else
-	struct drm_file *file_priv = filp->f_data;
-#endif
 	__poll_t mask = 0;
 
-//	poll_wait(filp, &file_priv->event_wait, wait);
+	poll_wait(filp, &file_priv->event_wait, wait);
 
 	if (!list_empty(&file_priv->event_list))
-#ifdef __linux__
 		mask |= EPOLLIN | EPOLLRDNORM;
-#else
-		mask |= POLLIN | POLLRDNORM;
-#endif
 
 	return mask;
+#else
+	struct drm_file *file_priv;
+	struct drm_device *dev;
+	unsigned long irqflags;
+	int revents;
+
+	file_priv = filp->private_data;
+	dev = file_priv->minor->dev;
+
+	revents = 0;
+	spin_lock_irqsave(&dev->event_lock, irqflags);
+	if (list_empty(&file_priv->event_list))
+		selrecord(curthread, &file_priv->event_poll);
+	else
+		revents = POLLIN | POLLRDNORM;
+	spin_unlock_irqrestore(&dev->event_lock, irqflags);
+
+	return (revents);
+#endif
 }
 EXPORT_SYMBOL(drm_poll);
 
@@ -797,6 +790,10 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
 	list_add_tail(&e->link,
 		      &e->file_priv->event_list);
 	wake_up_interruptible(&e->file_priv->event_wait);
+#ifndef __linux__
+	selwakeup(&e->file_priv->event_poll);
+#endif
+
 }
 EXPORT_SYMBOL(drm_send_event_locked);
 

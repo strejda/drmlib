@@ -351,11 +351,7 @@ unsigned long drm_gem_cma_get_unmapped_area(struct file *filp,
 {
 	struct drm_gem_cma_object *cma_obj;
 	struct drm_gem_object *obj = NULL;
-#ifdef __linux__
 	struct drm_file *priv = filp->private_data;
-#else
-	struct drm_file *priv = filp->f_data;
-#endif
 	struct drm_device *dev = priv->minor->dev;
 	struct drm_vma_offset_node *node;
 

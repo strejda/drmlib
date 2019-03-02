@@ -494,8 +494,6 @@ static int drm_syncobj_fd_to_handle(struct drm_file *file_private,
 		fput(file);
 		return -EINVAL;
 	}
-	/* take a reference to put in the idr */
-	syncobj = file->private_data;
 #else
 	cap_rights_t rights;
 
@@ -507,9 +505,10 @@ static int drm_syncobj_fd_to_handle(struct drm_file *file_private,
 		fdrop(file, curthread);
 		return -EINVAL;
 	}
+#endif
 	/* take a reference to put in the idr */
 	syncobj = file->f_data;
-#endif
+
 	drm_syncobj_get(syncobj);
 
 	idr_preload(GFP_KERNEL);

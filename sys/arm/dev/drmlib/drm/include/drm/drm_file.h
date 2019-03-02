@@ -300,6 +300,9 @@ struct drm_file {
 
 	/** @event_wait: Waitqueue for new events added to @event_list. */
 	wait_queue_head_t event_wait;
+#ifndef __linux__
+	struct selinfo event_poll;
+#endif
 
 	/**
 	 * @pending_event_list:

@@ -569,11 +569,8 @@ int drm_mode_create_lease_ioctl(struct drm_device *dev,
 		goto out_lessee;
 	}
 
-#ifdef __linux__
 	lessee_priv = lessee_file->private_data;
-#else
-	lessee_priv = lessee_file->f_data;
-#endif
+
 	/* Change the file to a master one */
 	drm_master_put(&lessee_priv->master);
 	lessee_priv->master = lessee;
