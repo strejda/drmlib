@@ -49,7 +49,17 @@
 #define	S_IRUGO	(S_IRUSR | S_IRGRP | S_IROTH)
 #define	S_IWUGO	(S_IWUSR | S_IWGRP | S_IWOTH)
 
-#define  FMODE_UNSIGNED_OFFSET 0x2000
+
+/*
+ * This is ugly way how reduce number of #ifdef __linux__
+ * changes due to struct file FBSD <-> Linux file->private_data field naming
+ * difference. Alternatively, we may usee unnamed union in definition of
+ * struct file.
+ */
+#define	private_data	f_data
+#define	f_flags		f_flag
+#define	EPOLLIN		POLLIN
+#define	EPOLLRDNORM	POLLRDNORM
 
 typedef void *fl_owner_t;
 

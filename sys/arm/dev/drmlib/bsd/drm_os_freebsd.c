@@ -169,7 +169,9 @@ drm_fstub_poll(struct file *file, int events, struct ucred *cred,
 	const struct file_operations *fops;
 	int ref, rv;
 
-printf("%s: Enter\n", __func__);
+	if ((events & (POLLIN | POLLRDNORM)) != 0)
+		return (0);
+
 	rv = drm_fstub_file_check(file, &cdev, &ref, &minor);
 	if (rv != 0)
 		return (0);
@@ -179,12 +181,15 @@ printf("%s: Enter\n", __func__);
 		rv = 0;
 		goto out_release;
 	}
-	if (fops->poll != NULL)
-		rv = fops->poll(file, LINUX_POLL_TABLE_NORMAL) & events;
-	else
+	if (fops->poll != NULL) {
+		rv = fops->poll(file, LINUX_POLL_TABLE_NORMAL);
+		rv &= events;
+	} else {
 		rv = 0;
+	}
 
 out_release:
+if (rv != 0) printf("%s: Leave \n", __func__);
 	dev_relthread(cdev, ref);
 	return (rv);
 }

@@ -37,14 +37,4 @@
 #include <linux/wait.h>
 #include <linux/file.h>
 
-#if 0
-typedef struct poll_table_struct {
-} poll_table;
-
-extern void linux_poll_wait(struct linux_file *, wait_queue_head_t *, poll_table *);
-#define	poll_wait(...) linux_poll_wait(__VA_ARGS__)
-
-extern void linux_poll_wakeup(struct linux_file *);
-#endif
-
 #endif	/* _LINUX_POLL_H_ */
