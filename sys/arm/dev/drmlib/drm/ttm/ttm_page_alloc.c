@@ -31,9 +31,6 @@
  * - doesn't track currently in use pages
  */
 
-#ifndef __linux__
-#undef pr_fmt
-#endif
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <linux/list.h>

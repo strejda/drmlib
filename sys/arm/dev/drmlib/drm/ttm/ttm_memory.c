@@ -26,9 +26,6 @@
  *
  **************************************************************************/
 
-#ifndef __linux__
-#undef pr_fmt
-#endif
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <drm/ttm/ttm_memory.h>

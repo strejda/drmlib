@@ -29,9 +29,6 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
-#ifndef __linux__
-#undef pr_fmt
-#endif
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <linux/sched.h>
@@ -222,11 +219,7 @@ void ttm_tt_destroy(struct ttm_tt *ttm)
 
 	if (!(ttm->page_flags & TTM_PAGE_FLAG_PERSISTENT_SWAP) &&
 	    ttm->swap_storage)
-#ifdef __linux__
 		fput(ttm->swap_storage);
-#else
-		fdrop(ttm->swap_storage, curthread);
-#endif
 	ttm->swap_storage = NULL;
 	ttm->func->destroy(ttm);
 }

@@ -29,9 +29,6 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
-#ifndef __linux__
-#undef pr_fmt
-#endif
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <drm/ttm/ttm_module.h>
@@ -1567,9 +1564,7 @@ int ttm_bo_device_init(struct ttm_bo_device *bdev,
 				    0x10000000);
 	INIT_DELAYED_WORK(&bdev->wq, ttm_bo_delayed_workqueue);
 	INIT_LIST_HEAD(&bdev->ddestroy);
-#ifdef __linux__
 	bdev->dev_mapping = mapping;
-#endif
 	bdev->glob = glob;
 	bdev->need_dma32 = need_dma32;
 	mutex_lock(&glob->device_list_mutex);
