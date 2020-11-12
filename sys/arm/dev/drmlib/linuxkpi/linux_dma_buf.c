@@ -167,11 +167,12 @@ dma_buf_put(struct dma_buf *dmabuf)
 void
 get_dma_buf(struct dma_buf *dmabuf)
 {
+	int rv;
 
 	MPASS(dmabuf != NULL);
 	MPASS(dmabuf->db_file != NULL);
 
-	fhold(dmabuf->db_file);
+	rv = fhold(dmabuf->db_file);
 }
 
 struct dma_buf_attachment *

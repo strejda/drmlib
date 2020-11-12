@@ -86,7 +86,7 @@ printf("%s: Enter\n", __func__);
 	} else {
 		rv = -bytes;
 	}
-	foffset_unlock_uio(file, uio, flags | FOF_NOLOCK | FOF_NEXTOFF);
+	foffset_unlock_uio(file, uio, flags | FOF_NOLOCK | FOF_NEXTOFF_R | FOF_NEXTOFF_W);
 	dev_relthread(cdev, ref);
 	return (rv);
 
@@ -134,7 +134,7 @@ printf("%s: Enter\n", __func__);
 	} else {
 		rv = -bytes;
 	}
-	foffset_unlock_uio(file, uio, flags | FOF_NOLOCK | FOF_NEXTOFF);
+	foffset_unlock_uio(file, uio, flags | FOF_NOLOCK | FOF_NEXTOFF_W | FOF_NEXTOFF_R);
 	dev_relthread(cdev, ref);
 	return (rv);
 
@@ -322,8 +322,7 @@ drm_cdev_pager_fault(vm_object_t vm_obj, vm_ooffset_t offset, int prot,
 			page = vm_page_getfake(paddr, vm_obj->memattr);
 			VM_OBJECT_WLOCK(vm_obj);
 
-			vm_page_replace_checked(page, vm_obj,
-			    (*mres)->pindex, *mres);
+			vm_page_replace(page, vm_obj, (*mres)->pindex, *mres);
 
 			vm_page_lock(*mres);
 			vm_page_free(*mres);

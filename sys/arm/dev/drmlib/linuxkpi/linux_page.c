@@ -201,7 +201,6 @@ linux_get_user_pages_internal(vm_map_t map, unsigned long start, int nr_pages,
 
 		vm_page_lock(pg);
 		vm_page_wire(pg);
-		vm_page_unhold(pg);
 		vm_page_unlock(pg);
 	}
 	return (nr_pages);
@@ -236,7 +235,6 @@ __get_user_pages_fast(unsigned long start, int nr_pages, int write,
 
 		vm_page_lock(*mp);
 		vm_page_wire(*mp);
-		vm_page_unhold(*mp);
 		vm_page_unlock(*mp);
 
 		if ((prot & VM_PROT_WRITE) != 0 &&
